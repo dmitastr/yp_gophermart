@@ -1,7 +1,17 @@
 package main
 
-import "fmt"
+import (
+	"log"
+	"net/http"
+
+	"github.com/dmitastr/yp_gophermart/internal/app"
+)
 
 func main() {
-	fmt.Println("Hello, Go!")
+	router := app.Init()
+
+	if err := http.ListenAndServe(":8080", router); err != nil {
+		log.Fatal(err)
+	}
+
 }
