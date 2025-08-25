@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
+	serviceErrors "github.com/dmitastr/yp_gophermart/internal/domain/errors"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service"
 	"github.com/gin-gonic/gin"
@@ -22,13 +24,17 @@ func (l Login) Handle(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := l.service.LoginUser(user); err != nil {
+	err := l.service.LoginUser(user)
+	if errors.Is(err, serviceErrors.ErrorBadUserPassword) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	token, err := l.service.IssueJWT(user)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.SetCookie("Authorization", token, 3600, "", "", false, true)

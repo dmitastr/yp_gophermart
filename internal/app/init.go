@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/datasources/memstorage"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/gophermart_service"
 	"github.com/dmitastr/yp_gophermart/internal/presentation/handlers"
@@ -8,9 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Init() *gin.Engine {
+func Init(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
-	db := memstorage.NewMemStorage()
+	db := memstorage.NewMemStorage(cfg)
 	service := gophermart_service.NewGophermartService(db)
 
 	authCheck := middleware.NewAuthorizeCheck(service)

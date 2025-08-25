@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
+	serviceErrors "github.com/dmitastr/yp_gophermart/internal/domain/errors"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service"
 	"github.com/gin-gonic/gin"
@@ -23,7 +25,10 @@ func (r Register) Handle(c *gin.Context) {
 		return
 	}
 	token, err := r.service.RegisterUser(user)
-	if err != nil {
+	if errors.Is(err, serviceErrors.ErrorUserExists) {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
