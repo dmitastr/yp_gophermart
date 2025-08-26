@@ -6,6 +6,9 @@ import (
 	"log"
 	"time"
 
+	"context"
+
+	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/datasources"
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/domain/errors"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
@@ -18,15 +21,15 @@ type GophermartService struct {
 	key []byte
 }
 
-func NewGophermartService(db datasources.Database) *GophermartService {
+func NewGophermartService(cfg *config.Config, db datasources.Database) *GophermartService {
 	g := &GophermartService{db: db}
-	g.GenerateSecretKey()
+	g.GenerateSecretKey(cfg.Key)
 	return g
 }
 
-func (g *GophermartService) RegisterUser(user models.User) (string, error) {
+func (g *GophermartService) RegisterUser(ctx context.Context, user models.User) (string, error) {
 	user.Hash = g.HashGenerate(user.Password)
-	if err := g.db.RegisterUser(user); err != nil {
+	if err := g.db.InsertUser(ctx, user); err != nil {
 		return "", fmt.Errorf("failed to register user: %w", err)
 	}
 
@@ -38,15 +41,13 @@ func (g *GophermartService) RegisterUser(user models.User) (string, error) {
 	return token, nil
 }
 
-func (g *GophermartService) LoginUser(user models.User) error {
-	hashActual := g.HashGenerate(user.Password)
-	userExpected, err := g.db.GetUser(user.Name)
+func (g *GophermartService) LoginUser(ctx context.Context, user models.User) error {
+	userExpected, err := g.db.GetUser(ctx, user.Name)
 	if err != nil {
-		return serviceErrors.ErrorBadUserPassword
+		return serviceErrors.ErrorDoesNotUserExist
 	}
 
-	hashExpected := g.HashGenerate(userExpected.Password)
-	if hashActual == hashExpected {
+	if err := bcrypt.CompareHashAndPassword([]byte(userExpected.Password), []byte(user.Password)); err == nil {
 		return nil
 	}
 
@@ -86,10 +87,15 @@ func (g *GophermartService) HashGenerate(password string) string {
 	return string(hash)
 }
 
-func (g *GophermartService) GenerateSecretKey() {
-	g.key = make([]byte, 32)
-	_, err := rand.Read(g.key)
-	if err != nil {
-		log.Fatalf("Error generating random key: %v", err)
+func (g *GophermartService) GenerateSecretKey(key string) {
+	if key == "" {
+		g.key = make([]byte, 32)
+		_, err := rand.Read(g.key)
+		if err != nil {
+			log.Fatalf("Error generating random key: %v", err)
+		}
+		return
 	}
+
+	g.key = []byte(key)
 }

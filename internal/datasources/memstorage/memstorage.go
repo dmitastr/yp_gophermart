@@ -1,6 +1,7 @@
 package memstorage
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -18,18 +19,22 @@ func NewMemStorage(cfg *config.Config) *MemStorage {
 	return &MemStorage{data: make(map[string]string)}
 }
 
-func (m *MemStorage) RegisterUser(user models.User) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
+func (m *MemStorage) InsertUser(ctx context.Context, user models.User) error {
 	if _, ok := m.data[user.Name]; ok {
 		return serviceErrors.ErrorUserExists
 	}
+	return m.UpdateUser(ctx, user)
+}
+
+func (m *MemStorage) UpdateUser(ctx context.Context, user models.User) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.data[user.Name] = user.Hash
 	return nil
 }
 
-func (m *MemStorage) GetUser(username string) (models.User, error) {
+func (m *MemStorage) GetUser(ctx context.Context, username string) (models.User, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	hash, ok := m.data[username]
