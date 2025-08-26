@@ -4,6 +4,8 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/dmitastr/yp_gophermart/internal/config"
+	serviceErrors "github.com/dmitastr/yp_gophermart/internal/domain/errors"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 )
 
@@ -12,7 +14,7 @@ type MemStorage struct {
 	data map[string]string
 }
 
-func NewMemStorage() *MemStorage {
+func NewMemStorage(cfg *config.Config) *MemStorage {
 	return &MemStorage{data: make(map[string]string)}
 }
 
@@ -20,6 +22,9 @@ func (m *MemStorage) RegisterUser(user models.User) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if _, ok := m.data[user.Name]; ok {
+		return serviceErrors.ErrorUserExists
+	}
 	m.data[user.Name] = user.Hash
 	return nil
 }

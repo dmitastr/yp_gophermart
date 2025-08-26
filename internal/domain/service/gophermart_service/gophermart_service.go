@@ -2,12 +2,12 @@ package gophermart_service
 
 import (
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/dmitastr/yp_gophermart/internal/datasources"
+	serviceErrors "github.com/dmitastr/yp_gophermart/internal/domain/errors"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -27,7 +27,7 @@ func NewGophermartService(db datasources.Database) *GophermartService {
 func (g *GophermartService) RegisterUser(user models.User) (string, error) {
 	user.Hash = g.HashGenerate(user.Password)
 	if err := g.db.RegisterUser(user); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to register user: %w", err)
 	}
 
 	token, err := g.IssueJWT(user)
@@ -42,13 +42,15 @@ func (g *GophermartService) LoginUser(user models.User) error {
 	hashActual := g.HashGenerate(user.Password)
 	userExpected, err := g.db.GetUser(user.Name)
 	if err != nil {
-		return err
+		return serviceErrors.ErrorBadUserPassword
 	}
+
 	hashExpected := g.HashGenerate(userExpected.Password)
 	if hashActual == hashExpected {
 		return nil
 	}
-	return errors.New("passwords does not match")
+
+	return serviceErrors.ErrorBadUserPassword
 }
 
 func (g *GophermartService) IssueJWT(user models.User) (string, error) {
