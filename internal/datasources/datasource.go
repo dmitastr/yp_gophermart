@@ -1,10 +1,13 @@
 package datasources
 
 import (
+	"context"
+
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 )
 
 type Database interface {
-	RegisterUser(models.User) error
-	GetUser(string) (models.User, error)
+	InsertUser(context.Context, models.User) error
+	UpdateUser(context.Context, models.User) error
+	GetUser(context.Context, string) (models.User, error)
 }

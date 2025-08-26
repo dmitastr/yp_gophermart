@@ -24,7 +24,7 @@ func (r Register) Handle(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	token, err := r.service.RegisterUser(user)
+	token, err := r.service.RegisterUser(c, user)
 	if errors.Is(err, serviceErrors.ErrorUserExists) {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return

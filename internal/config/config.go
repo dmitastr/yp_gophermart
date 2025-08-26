@@ -11,11 +11,12 @@ type Config struct {
 	Address        string `mapstructure:"RUN_ADDRESS"`
 	DatabaseURI    string `mapstructure:"DATABASE_URI"`
 	AccrualAddress string `mapstructure:"ACCRUAL_SYSTEM_ADDRESS"`
+	Key            string `mapstructure:"KEY"`
 }
 
 func LoadConfig() (config *Config, err error) {
 	address := flag.String("a", "", "The address to listen on for HTTP requests.")
-	databaseURI := flag.String("d", ":memory:", "The database URI to use")
+	databaseURI := flag.String("d", "", "The database URI to use")
 	accrualAddress := flag.String("r", "", "The accrual address")
 	flag.Parse()
 
