@@ -16,7 +16,7 @@ func NewAuthorizeCheck(service service.Service) *AuthorizeCheck {
 	return &AuthorizeCheck{service: service}
 }
 
-func (a AuthorizeCheck) Handle(c *gin.Context) {
+func (a *AuthorizeCheck) Handle(c *gin.Context) {
 	cookie, err := c.Cookie("Authorization")
 	if cookie == "" || err != nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization cookie"})

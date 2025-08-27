@@ -77,6 +77,21 @@ func (p *PostgresStorage) UpdateUser(ctx context.Context, user models.User) erro
 	return err
 }
 
+func (p *PostgresStorage) GetOrders(ctx context.Context, username string) ([]models.Order, error) {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := tx.Query(ctx, "SELECT order_id, status, accrual, uploaded_at FROM orders WHERE username = $1", username)
+	if err != nil {
+		tx.Rollback(ctx)
+		return nil, err
+	}
+
+	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Order])
+}
+
 func (p *PostgresStorage) toNamedArgs(user models.User) pgx.NamedArgs {
 	return pgx.NamedArgs{"name": user.Name, "pass": user.Hash, "created_at": time.Now()}
 }
