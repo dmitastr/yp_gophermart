@@ -54,6 +54,10 @@ func (g *GophermartService) LoginUser(ctx context.Context, user models.User) err
 	return serviceErrors.ErrorBadUserPassword
 }
 
+func (g *GophermartService) GetOrders(ctx context.Context, username string) ([]models.Order, error) {
+	return g.db.GetOrders(ctx, username)
+}
+
 func (g *GophermartService) IssueJWT(user models.User) (string, error) {
 	claims := jwt.RegisteredClaims{
 		Subject:   user.Name,

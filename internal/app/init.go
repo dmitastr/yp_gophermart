@@ -33,8 +33,16 @@ func Init(cfg *config.Config) *gin.Engine {
 
 	authCheck := middleware.NewAuthorizeCheck(service)
 
-	router.POST("/register", handlers.NewRegister(service).Handle)
-	router.POST("/login", handlers.NewLogin(service).Handle)
+	api := router.Group("/api")
+
+	users := api.Group("/user")
+	users.POST("/register", handlers.NewRegister(service).Handle)
+	users.POST("/login", handlers.NewLogin(service).Handle)
+
+	orders := users.Group("/orders", authCheck.Handle)
+	orders.GET("/", handlers.NewGetOrder(service).Handle)
+	// orders.POST("/")
+
 	router.GET("/check", authCheck.Handle, handlers.NewCheckHandler(service).Handle)
 	return router
 }
