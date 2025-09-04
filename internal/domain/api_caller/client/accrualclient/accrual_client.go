@@ -13,16 +13,16 @@ import (
 
 type AccrualClient struct {
 	client  *http.Client
-	baseUrl string
+	baseURL string
 }
 
-func NewAccrualClient(baseUrl string) *AccrualClient {
-	baseUrl = "http://" + baseUrl
-	return &AccrualClient{baseUrl: baseUrl, client: &http.Client{Timeout: 10 * time.Second}}
+func NewAccrualClient(baseURL string) *AccrualClient {
+	baseURL = "http://" + baseURL
+	return &AccrualClient{baseURL: baseURL, client: &http.Client{Timeout: 10 * time.Second}}
 }
 
 func (a *AccrualClient) GetOrder(ctx context.Context, orderID string) (order *models.Order, statusCode int, err error) {
-	callURL, _ := url.JoinPath(a.baseUrl, "api/orders", orderID)
+	callURL, _ := url.JoinPath(a.baseURL, "api/orders", orderID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, callURL, nil)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error creating request: %w", err)

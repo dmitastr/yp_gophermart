@@ -53,12 +53,12 @@ func (a *AccrualCaller) start() {
 
 func (a *AccrualCaller) workerStart() {
 	for j := range a.queue {
-		orderId := j.orderID
-		order, statusCode, err := a.client.GetOrder(context.Background(), orderId)
+		orderID := j.orderID
+		order, statusCode, err := a.client.GetOrder(context.Background(), orderID)
 
 		a.mu.Lock()
-		waiters := a.jobResults[orderId]
-		delete(a.jobResults, orderId)
+		waiters := a.jobResults[orderID]
+		delete(a.jobResults, orderID)
 		a.mu.Unlock()
 
 		result := WorkerResult{Order: order, Code: statusCode, Err: err}
