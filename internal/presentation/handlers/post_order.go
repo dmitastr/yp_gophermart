@@ -23,12 +23,12 @@ func NewPostOrder(service service.Service) *PostOrder {
 	return &PostOrder{service: service}
 }
 
-func (h *PostOrder) IsOrderIdValid(orderId string) bool {
-	orderIdInt, err := strconv.Atoi(orderId)
+func (h *PostOrder) IsOrderIDValid(orderID string) bool {
+	orderIDInt, err := strconv.Atoi(orderID)
 	if err != nil {
 		return false
 	}
-	return luhn.Valid(orderIdInt)
+	return luhn.Valid(orderIDInt)
 }
 
 func (h *PostOrder) Handle(c *gin.Context) {
@@ -44,7 +44,7 @@ func (h *PostOrder) Handle(c *gin.Context) {
 	}
 
 	orderID := strings.TrimSpace(string(body))
-	if !h.IsOrderIdValid(orderID) {
+	if !h.IsOrderIDValid(orderID) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "bad order id"})
 		return
 	}
