@@ -41,7 +41,7 @@ func Init(cfg *config.Config) *gin.Engine {
 
 	orders := users.Group("/orders", authCheck.Handle)
 	orders.GET("/", handlers.NewGetOrder(service).Handle)
-	// orders.POST("/")
+	orders.POST("/", handlers.NewPostOrder(service).Handle)
 
 	router.GET("/check", authCheck.Handle, handlers.NewCheckHandler(service).Handle)
 	return router

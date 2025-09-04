@@ -83,13 +83,62 @@ func (p *PostgresStorage) GetOrders(ctx context.Context, username string) ([]mod
 		return nil, err
 	}
 
-	rows, err := tx.Query(ctx, "SELECT order_id, status, accrual, uploaded_at FROM orders WHERE username = $1", username)
+	query := `SELECT order_id, status, accrual, uploaded_at, username
+				FROM orders 
+                WHERE username = $1 
+                ORDER BY uploaded_at DESC`
+
+	rows, err := tx.Query(ctx, query, username)
 	if err != nil {
+		fmt.Printf("error getting orders: %v\n", err)
 		tx.Rollback(ctx)
 		return nil, err
 	}
 
 	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Order])
+}
+
+func (p *PostgresStorage) GetOrder(ctx context.Context, orderId string) (*models.Order, error) {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	query := `SELECT order_id, status, accrual, uploaded_at, username
+				FROM orders 
+                WHERE order_id = $1
+                ORDER BY uploaded_at DESC`
+
+	var order models.Order
+	err = tx.QueryRow(ctx, query, orderId).Scan(&order.OrderId, &order.Status, &order.Accrual, &order.UploadedAt, &order.Username)
+	if err != nil {
+		tx.Rollback(ctx)
+		return nil, err
+	}
+
+	return &order, nil
+}
+
+func (p *PostgresStorage) PostOrder(ctx context.Context, order *models.Order) (*models.Order, error) {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	query := `INSERT INTO orders (order_id, status, accrual, uploaded_at, username) 
+	VALUES (@order_id, @status, @accrual, @uploaded_at, @username) 
+	ON CONFLICT (order_id, username)  DO UPDATE SET 
+	status = @status, 
+    accrual = @accrual`
+
+	if _, err := tx.Exec(ctx, query, order.ToNamedArgs()); err != nil {
+		tx.Rollback(ctx)
+		return nil, err
+	}
+	defer tx.Commit(ctx)
+
+	return order, nil
+
 }
 
 func (p *PostgresStorage) toNamedArgs(user models.User) pgx.NamedArgs {
