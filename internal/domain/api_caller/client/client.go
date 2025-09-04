@@ -7,5 +7,5 @@ import (
 )
 
 type Client interface {
-	GetOrder(ctx context.Context, orderId string) (order *models.Order, statusCode int, err error)
+	GetOrder(ctx context.Context, orderID string) (order *models.Order, statusCode int, err error)
 }

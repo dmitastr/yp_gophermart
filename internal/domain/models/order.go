@@ -15,20 +15,20 @@ var (
 )
 
 type Order struct {
-	OrderId        string    `json:"number" db:"order_id"`
-	AccrualOrderId string    `json:"order,omitempty" db:"-"`
+	OrderID        string    `json:"number" db:"order_id"`
+	AccrualOrderID string    `json:"order,omitempty" db:"-"`
 	Status         string    `json:"status" db:"status"`
 	Accrual        float64   `json:"accrual" db:"accrual"`
 	UploadedAt     time.Time `json:"uploaded_at" db:"uploaded_at"`
 	Username       string    `json:"username" db:"username"`
 }
 
-func NewOrder(orderId string, username string) *Order {
-	return &Order{OrderId: orderId, UploadedAt: time.Now(), Username: username}
+func NewOrder(orderID string, username string) *Order {
+	return &Order{OrderID: orderID, UploadedAt: time.Now(), Username: username}
 }
 
 func (order *Order) ToNamedArgs() pgx.NamedArgs {
-	return pgx.NamedArgs{"order_id": order.OrderId, "username": order.Username, "uploaded_at": order.UploadedAt,
+	return pgx.NamedArgs{"order_id": order.OrderID, "username": order.Username, "uploaded_at": order.UploadedAt,
 		"accrual": order.Accrual, "status": order.Status}
 
 }
@@ -37,12 +37,12 @@ func (order *Order) IsFinal() bool {
 	return order.Status == StatusProcessed || order.Status == StatusInvalid
 }
 
-func (order *Order) SetOrderId(orderId string) {
-	accrualNumber := order.AccrualOrderId
-	order.AccrualOrderId = ""
+func (order *Order) SetOrderID(orderID string) {
+	accrualNumber := order.AccrualOrderID
+	order.AccrualOrderID = ""
 	if accrualNumber != "" {
-		order.OrderId = accrualNumber
+		order.OrderID = accrualNumber
 		return
 	}
-	order.OrderId = orderId
+	order.OrderID = orderID
 }

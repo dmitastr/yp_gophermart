@@ -43,21 +43,21 @@ func (h *PostOrder) Handle(c *gin.Context) {
 		return
 	}
 
-	orderId := strings.TrimSpace(string(body))
-	if !h.IsOrderIdValid(orderId) {
+	orderID := strings.TrimSpace(string(body))
+	if !h.IsOrderIdValid(orderID) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "bad order id"})
 		return
 	}
 
-	order := models.NewOrder(orderId, username.(string))
+	order := models.NewOrder(orderID, username.(string))
 	order, err, exist := h.service.PostOrder(c, order)
 
-	if errors.Is(err, serviceErrors.ErrorOrderIdAlreadyExists) {
-		fmt.Printf("order id=%s was already uploaded by different user", orderId)
+	if errors.Is(err, serviceErrors.ErrorOrderIDAlreadyExists) {
+		fmt.Printf("order id=%s was already uploaded by different user", orderID)
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	} else if err != nil {
-		fmt.Printf("error posting order with order id=%s, err=%v\n", orderId, err)
+		fmt.Printf("error posting order with order id=%s, err=%v\n", orderID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

@@ -1,4 +1,4 @@
-package postgres_storage
+package postgresstorage
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"github.com/jackc/pgx/v5"
-	_ "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/tracelog"
 )
@@ -98,7 +97,7 @@ func (p *PostgresStorage) GetOrders(ctx context.Context, username string) ([]mod
 	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Order])
 }
 
-func (p *PostgresStorage) GetOrder(ctx context.Context, orderId string) (*models.Order, error) {
+func (p *PostgresStorage) GetOrder(ctx context.Context, orderID string) (*models.Order, error) {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -110,7 +109,7 @@ func (p *PostgresStorage) GetOrder(ctx context.Context, orderId string) (*models
                 ORDER BY uploaded_at DESC`
 
 	var order models.Order
-	err = tx.QueryRow(ctx, query, orderId).Scan(&order.OrderId, &order.Status, &order.Accrual, &order.UploadedAt, &order.Username)
+	err = tx.QueryRow(ctx, query, orderID).Scan(&order.OrderID, &order.Status, &order.Accrual, &order.UploadedAt, &order.Username)
 	if err != nil {
 		tx.Rollback(ctx)
 		return nil, err

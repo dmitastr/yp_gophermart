@@ -1,4 +1,4 @@
-package accrual_client
+package accrualclient
 
 import (
 	"encoding/json"
@@ -21,9 +21,9 @@ func NewAccrualClient(baseUrl string) *AccrualClient {
 	return &AccrualClient{baseUrl: baseUrl, client: &http.Client{Timeout: 10 * time.Second}}
 }
 
-func (a *AccrualClient) GetOrder(ctx context.Context, orderId string) (order *models.Order, statusCode int, err error) {
-	callUrl, _ := url.JoinPath(a.baseUrl, "api/orders", orderId)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, callUrl, nil)
+func (a *AccrualClient) GetOrder(ctx context.Context, orderID string) (order *models.Order, statusCode int, err error) {
+	callURL, _ := url.JoinPath(a.baseUrl, "api/orders", orderID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, callURL, nil)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error creating request: %w", err)
 	}
@@ -41,7 +41,9 @@ func (a *AccrualClient) GetOrder(ctx context.Context, orderId string) (order *mo
 	if err != nil {
 		return nil, 0, fmt.Errorf("error decoding response: %w", err)
 	}
-	order.SetOrderId(orderId)
+	defer resp.Body.Close()
+
+	order.SetOrderID(orderID)
 	statusCode = resp.StatusCode
 
 	return

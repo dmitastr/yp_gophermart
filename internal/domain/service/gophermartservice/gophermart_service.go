@@ -1,4 +1,4 @@
-package gophermart_service
+package gophermartservice
 
 import (
 	"crypto/rand"
@@ -13,7 +13,7 @@ import (
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/datasources"
 	"github.com/dmitastr/yp_gophermart/internal/domain/api_caller/caller"
-	"github.com/dmitastr/yp_gophermart/internal/domain/api_caller/caller/accrual_caller"
+	"github.com/dmitastr/yp_gophermart/internal/domain/api_caller/caller/accrualcaller"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 	"github.com/golang-jwt/jwt/v5"
@@ -34,7 +34,7 @@ func NewGophermartService(cfg *config.Config, db datasources.Database) *Gopherma
 		db:           db,
 		pollInterval: time.Second * 1,
 		pollQueue:    make(map[string]*models.Order),
-		caller:       accrual_caller.NewAccrualCaller(cfg),
+		caller:       accrualcaller.NewAccrualCaller(cfg),
 	}
 	g.GenerateSecretKey(cfg.Key)
 	go g.startPolling()
@@ -91,12 +91,12 @@ func (g *GophermartService) IssueJWT(user models.User) (string, error) {
 }
 
 func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) (*models.Order, error, bool) {
-	fmt.Printf("post order=%s into db\n", order.OrderId)
-	existedOrder, _ := g.db.GetOrder(ctx, order.OrderId)
+	fmt.Printf("post order=%s into db\n", order.OrderID)
+	existedOrder, _ := g.db.GetOrder(ctx, order.OrderID)
 	if existedOrder != nil {
 		if existedOrder.Username != order.Username {
-			fmt.Printf("order id=%s already in db\n", order.OrderId)
-			return nil, serviceErrors.ErrorOrderIdAlreadyExists, false
+			fmt.Printf("order id=%s already in db\n", order.OrderID)
+			return nil, serviceErrors.ErrorOrderIDAlreadyExists, false
 		}
 		return existedOrder, nil, true
 	}
@@ -106,10 +106,10 @@ func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) 
 
 func (g *GophermartService) updateOrder(ctx context.Context, order *models.Order) (*models.Order, error) {
 	g.mu.Lock()
-	delete(g.pollQueue, order.OrderId)
+	delete(g.pollQueue, order.OrderID)
 	g.mu.Unlock()
 
-	respChan, err := g.caller.AddJob(order.OrderId)
+	respChan, err := g.caller.AddJob(order.OrderID)
 	if err != nil {
 		return nil, err
 	}
@@ -121,13 +121,13 @@ func (g *GophermartService) updateOrder(ctx context.Context, order *models.Order
 	}
 
 	if result.Code == http.StatusOK || result.Code == http.StatusNoContent {
-		if _, ok := g.pollQueue[newOrder.OrderId]; !ok && !newOrder.IsFinal() {
-			fmt.Printf("add %s to poll queue\n", order.OrderId)
-			g.pollQueue[newOrder.OrderId] = newOrder
+		if _, ok := g.pollQueue[newOrder.OrderID]; !ok && !newOrder.IsFinal() {
+			fmt.Printf("add %s to poll queue\n", order.OrderID)
+			g.pollQueue[newOrder.OrderID] = newOrder
 		}
 
 		newOrder.Username = order.Username
-		newOrder.OrderId = order.OrderId
+		newOrder.OrderID = order.OrderID
 		newOrder.UploadedAt = time.Now()
 		if newOrder.Status == "" {
 			newOrder.Status = models.StatusNew
@@ -179,7 +179,7 @@ func (g *GophermartService) startPolling() {
 	for range time.Tick(g.pollInterval) {
 		for _, order := range g.pollQueue {
 			go func() {
-				fmt.Printf("polling order %s\n", order.OrderId)
+				fmt.Printf("polling order %s\n", order.OrderID)
 				_, _ = g.updateOrder(context.Background(), order)
 			}()
 		}

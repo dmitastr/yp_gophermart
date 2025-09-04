@@ -1,4 +1,4 @@
-package accrual_caller
+package accrualcaller
 
 import (
 	"errors"
@@ -6,14 +6,14 @@ import (
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/domain/api_caller/client"
-	"github.com/dmitastr/yp_gophermart/internal/domain/api_caller/client/accrual_client"
+	"github.com/dmitastr/yp_gophermart/internal/domain/api_caller/client/accrualclient"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"golang.org/x/net/context"
 )
 
 type (
 	job struct {
-		orderId  string
+		orderID  string
 		respChan chan WorkerResult
 	}
 	WorkerResult struct {
@@ -36,7 +36,7 @@ func NewAccrualCaller(cfg *config.Config) *AccrualCaller {
 	caller := AccrualCaller{
 		workersNum:   10,
 		pollInterval: 1,
-		client:       accrual_client.NewAccrualClient(cfg.AccrualAddress),
+		client:       accrualclient.NewAccrualClient(cfg.AccrualAddress),
 		queue:        make(chan job),
 		jobResults:   make(map[string][]chan WorkerResult),
 	}
@@ -53,7 +53,7 @@ func (a *AccrualCaller) start() {
 
 func (a *AccrualCaller) workerStart() {
 	for j := range a.queue {
-		orderId := j.orderId
+		orderId := j.orderID
 		order, statusCode, err := a.client.GetOrder(context.Background(), orderId)
 
 		a.mu.Lock()
@@ -77,7 +77,7 @@ func (a *AccrualCaller) AddJob(orderId string) (chan WorkerResult, error) {
 
 	a.jobResults[orderId] = []chan WorkerResult{respChan}
 	select {
-	case a.queue <- job{orderId: orderId, respChan: respChan}:
+	case a.queue <- job{orderID: orderId, respChan: respChan}:
 		return respChan, nil
 	default:
 		delete(a.jobResults, orderId)
