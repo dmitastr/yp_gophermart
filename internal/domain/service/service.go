@@ -13,4 +13,5 @@ type Service interface {
 	IssueJWT(models.User) (string, error)
 	VerifyJWT(string) (jwt.Claims, error)
 	GetOrders(context.Context, string) ([]models.Order, error)
+	PostOrder(context.Context, *models.Order) (*models.Order, error, bool)
 }

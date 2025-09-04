@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
-	serviceErrors "github.com/dmitastr/yp_gophermart/internal/domain/errors"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
+	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 )
 
 type MemStorage struct {

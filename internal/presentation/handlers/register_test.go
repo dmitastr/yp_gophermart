@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	serviceErrors "github.com/dmitastr/yp_gophermart/internal/domain/errors"
+	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 	"github.com/dmitastr/yp_gophermart/internal/mocks/service"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
