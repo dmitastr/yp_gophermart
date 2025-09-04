@@ -3,7 +3,6 @@ package postgresstorage
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
@@ -37,10 +36,10 @@ func NewPostgresStorage(ctx context.Context, cfg *config.Config) (*PostgresStora
 		"file://database/migrations",
 		cfg.DatabaseURI)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	if err := m.Up(); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	fmt.Println("Database migration succeeded")
 
