@@ -3,6 +3,7 @@ package postgresstorage
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
@@ -10,6 +11,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/tracelog"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 type PostgresStorage struct {
@@ -21,15 +26,24 @@ func NewPostgresStorage(ctx context.Context, cfg *config.Config) (*PostgresStora
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database config: %w", err)
 	}
-	// dbConfig.ConnConfig.Tracer = &tracelog.TraceLog{
-	// 	Logger:   logger.GetLogger(),
-	// 	LogLevel: tracelog.LogLevelInfo,
-	// }
+
 	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to db with url=%s: %v", cfg.DatabaseURI, err)
 	}
 	fmt.Println("Database connection established successfully")
+
+	m, err := migrate.New(
+		"file://database/migrations",
+		cfg.DatabaseURI)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := m.Up(); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Database migration succeeded")
+
 	return &PostgresStorage{pool: pool}, nil
 }
 
