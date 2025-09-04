@@ -68,19 +68,19 @@ func (a *AccrualCaller) workerStart() {
 	}
 }
 
-func (a *AccrualCaller) AddJob(orderId string) (chan WorkerResult, error) {
+func (a *AccrualCaller) AddJob(orderID string) (chan WorkerResult, error) {
 	respChan := make(chan WorkerResult)
-	if waiters, ok := a.jobResults[orderId]; ok {
-		a.jobResults[orderId] = append(waiters, respChan)
+	if waiters, ok := a.jobResults[orderID]; ok {
+		a.jobResults[orderID] = append(waiters, respChan)
 		return respChan, nil
 	}
 
-	a.jobResults[orderId] = []chan WorkerResult{respChan}
+	a.jobResults[orderID] = []chan WorkerResult{respChan}
 	select {
-	case a.queue <- job{orderID: orderId, respChan: respChan}:
+	case a.queue <- job{orderID: orderID, respChan: respChan}:
 		return respChan, nil
 	default:
-		delete(a.jobResults, orderId)
+		delete(a.jobResults, orderID)
 		close(respChan)
 		return nil, errors.New("job queue is full")
 	}
