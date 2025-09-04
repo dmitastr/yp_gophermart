@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 	"github.com/dmitastr/yp_gophermart/internal/mocks/service"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
@@ -26,40 +28,56 @@ func TestRegister_Handle(t *testing.T) {
 		token   string
 	}
 	tests := []struct {
-		name    string
-		wantErr bool
-		args    args
+		name       string
+		serviceErr error
+		wantStatus int
+		args       args
 	}{
 		{
-			name:    "valid payload",
-			wantErr: false,
-			args:    args{payload: []byte(`{"name": "abc", "password": "abc"}`), token: "token"},
+			name:       "valid payload",
+			serviceErr: nil,
+			wantStatus: http.StatusOK,
+			args:       args{payload: []byte(`{"name": "abc", "password": "abc"}`), token: "token"},
+		},
+		{
+			name:       "malformed data",
+			serviceErr: errors.New("some error"),
+			wantStatus: http.StatusBadRequest,
+			args:       args{payload: []byte(`{"abc"}`), token: "token"},
+		},
+		{
+			name:       "duplicated user",
+			serviceErr: serviceErrors.ErrorUserExists,
+			wantStatus: http.StatusConflict,
+			args:       args{payload: []byte(`{"name": "abc", "password": "abc"}`), token: "token"},
+		},
+		{
+			name:       "internal server error",
+			serviceErr: errors.New("some error"),
+			wantStatus: http.StatusInternalServerError,
+			args:       args{payload: []byte(`{"name": "abc", "password": "abc"}`), token: "token"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := mock_service.NewMockService(ctrl)
-
-			mockService.EXPECT().RegisterUser(gomock.Any()).Return(tt.args.token, nil).AnyTimes()
-
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
-			c.Request = &http.Request{
-				Header: make(http.Header),
+
+			req, _ := http.NewRequest(http.MethodPost, "/api/user/register", io.NopCloser(bytes.NewBuffer(tt.args.payload)))
+			req.Header.Set("Content-Type", "application/json; charset=utf-8")
+			c.Request = req
+
+			mockService := mock_service.NewMockService(ctrl)
+			mockService.EXPECT().RegisterUser(c, gomock.Any()).Return(tt.args.token, tt.serviceErr).AnyTimes()
+
+			Register{service: mockService}.Handle(c)
+
+			assert.EqualValues(t, tt.wantStatus, w.Code)
+
+			if tt.serviceErr == nil {
+				hasCookie := strings.Contains(w.Header().Get("Set-Cookie"), fmt.Sprintf("Authorization=%s", tt.args.token))
+				assert.True(t, hasCookie)
 			}
-			c.Request.Method = http.MethodPost
-			c.Request.Header.Set("Content-Type", "application/json; charset=utf-8")
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(tt.args.payload))
-
-			r := Register{
-				service: mockService,
-			}
-
-			r.Handle(c)
-
-			assert.EqualValues(t, http.StatusOK, w.Code)
-			hasCookie := strings.Contains(w.Header().Get("Set-Cookie"), fmt.Sprintf("Authorization=%s", tt.args.token))
-			assert.True(t, hasCookie)
 		})
 	}
 }

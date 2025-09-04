@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	serviceErrors "github.com/dmitastr/yp_gophermart/internal/domain/errors"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service"
+	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 	"github.com/gin-gonic/gin"
 )
 
