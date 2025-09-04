@@ -11,6 +11,6 @@ type Database interface {
 	UpdateUser(context.Context, models.User) error
 	GetUser(context.Context, string) (models.User, error)
 	GetOrders(context.Context, string) ([]models.Order, error)
-	GetOrder(ctx context.Context, orderId string) (*models.Order, error)
+	GetOrder(ctx context.Context, orderID string) (*models.Order, error)
 	PostOrder(context.Context, *models.Order) (*models.Order, error)
 }
