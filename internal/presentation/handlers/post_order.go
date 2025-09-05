@@ -55,15 +55,15 @@ func (h *PostOrder) Handle(c *gin.Context) {
 	}
 
 	order := models.NewOrder(orderID, usernameString)
-	order, err, exist := h.service.PostOrder(c, order)
+	order, err, exist, code := h.service.PostOrder(c, order)
 
 	if errors.Is(err, serviceErrors.ErrOrderIDAlreadyExists) {
-		fmt.Printf("order id=%s was already uploaded by different user", orderID)
+		fmt.Printf("order id=%s was already uploaded by different user\n", orderID)
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	} else if err != nil {
 		fmt.Printf("error posting order with order id=%s, err=%v\n", orderID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(code, gin.H{"error": err.Error()})
 		return
 	}
 	if exist {

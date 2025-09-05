@@ -13,5 +13,5 @@ type Service interface {
 	IssueJWT(models.User) (string, error)
 	VerifyJWT(string) (jwt.Claims, error)
 	GetOrders(context.Context, string) ([]models.Order, error)
-	PostOrder(context.Context, *models.Order) (*models.Order, error, bool)
+	PostOrder(context.Context, *models.Order) (order *models.Order, err error, exist bool, accrualStatusCode int)
 }

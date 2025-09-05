@@ -13,7 +13,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func Init(cfg *config.Config) *http.Server {
+func Init(ctx context.Context, cfg *config.Config) *http.Server {
 	router := gin.Default()
 
 	db, err := postgresstorage.NewPostgresStorage(context.Background(), cfg)
@@ -21,7 +21,7 @@ func Init(cfg *config.Config) *http.Server {
 		panic(err)
 	}
 
-	service := gophermartservice.NewGophermartService(cfg, db)
+	service := gophermartservice.NewGophermartService(ctx, cfg, db)
 
 	authCheck := middleware.NewAuthorizeCheck(service)
 
