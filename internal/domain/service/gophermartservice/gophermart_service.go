@@ -58,7 +58,7 @@ func NewGophermartService(ctx context.Context, cfg *config.Config, db datasource
 	}
 	g.GenerateSecretKey(cfg.Key)
 	g.start(ctx)
-	go g.startPolling(ctx)
+	// go g.startPolling(ctx)
 	return g
 }
 
@@ -206,7 +206,6 @@ func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) 
 		return nil, err, false
 	}
 	result := <-ch
-	fmt.Printf("post order=%v into db\n", order)
 	return result.Order, result.Err, false
 }
 
