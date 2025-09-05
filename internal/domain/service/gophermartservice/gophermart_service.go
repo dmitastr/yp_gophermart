@@ -58,14 +58,14 @@ func (g *GophermartService) RegisterUser(ctx context.Context, user models.User) 
 func (g *GophermartService) LoginUser(ctx context.Context, user models.User) error {
 	userExpected, err := g.db.GetUser(ctx, user.Name)
 	if err != nil {
-		return serviceErrors.ErrorDoesNotUserExist
+		return serviceErrors.ErrDoesNotUserExist
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(userExpected.Password), []byte(user.Password)); err == nil {
 		return nil
 	}
 
-	return serviceErrors.ErrorBadUserPassword
+	return serviceErrors.ErrBadUserPassword
 }
 
 func (g *GophermartService) GetOrders(ctx context.Context, username string) ([]models.Order, error) {
@@ -96,7 +96,7 @@ func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) 
 	if existedOrder != nil {
 		if existedOrder.Username != order.Username {
 			fmt.Printf("order id=%s already in db\n", order.OrderID)
-			return nil, serviceErrors.ErrorOrderIDAlreadyExists, false
+			return nil, serviceErrors.ErrOrderIDAlreadyExists, false
 		}
 		return existedOrder, nil, true
 	}

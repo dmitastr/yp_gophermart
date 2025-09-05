@@ -47,7 +47,7 @@ func TestRegister_Handle(t *testing.T) {
 		},
 		{
 			name:       "duplicated user",
-			serviceErr: serviceErrors.ErrorUserExists,
+			serviceErr: serviceErrors.ErrUserExists,
 			wantStatus: http.StatusConflict,
 			args:       args{payload: []byte(`{"name": "abc", "password": "abc"}`), token: "token"},
 		},
