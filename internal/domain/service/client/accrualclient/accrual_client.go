@@ -52,5 +52,5 @@ func (a *AccrualClient) GetOrder(ctx context.Context, orderID string) (order *mo
 	order.SetOrderID(orderID)
 	statusCode = resp.StatusCode
 
-	return
+	return order, resp.StatusCode, nil
 }
