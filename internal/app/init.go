@@ -1,6 +1,9 @@
 package app
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/datasources/postgresstorage"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/gophermartservice"
@@ -10,19 +13,8 @@ import (
 	"golang.org/x/net/context"
 )
 
-func Init(cfg *config.Config) *gin.Engine {
+func Init(cfg *config.Config) *http.Server {
 	router := gin.Default()
-
-	// var db datasources.Database
-	// var err error
-	// if cfg.DatabaseURI == ":memory:" {
-	// 	db = memstorage.NewMemStorage(cfg)
-	// } else {
-	// 	db, err = postgres_storage.NewPostgresStorage(context.Background(), cfg)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// }
 
 	db, err := postgresstorage.NewPostgresStorage(context.Background(), cfg)
 	if err != nil {
@@ -44,5 +36,12 @@ func Init(cfg *config.Config) *gin.Engine {
 	orders.POST("/", handlers.NewPostOrder(service).Handle)
 
 	router.GET("/check", authCheck.Handle, handlers.NewCheckHandler(service).Handle)
-	return router
+
+	server := &http.Server{
+		Addr:              cfg.Address,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		Handler:           router,
+	}
+	return server
 }

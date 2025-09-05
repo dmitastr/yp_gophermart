@@ -2,6 +2,7 @@ package postgresstorage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -38,7 +39,7 @@ func NewPostgresStorage(ctx context.Context, cfg *config.Config) (*PostgresStora
 	if err != nil {
 		return nil, err
 	}
-	if err := m.Up(); err != nil {
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return nil, err
 	}
 	fmt.Println("Database migration succeeded")
@@ -46,7 +47,7 @@ func NewPostgresStorage(ctx context.Context, cfg *config.Config) (*PostgresStora
 	return &PostgresStorage{pool: pool}, nil
 }
 
-func (p *PostgresStorage) InsertUser(ctx context.Context, user models.User) error {
+func (p *PostgresStorage) InsertUser(ctx context.Context, user models.User) (err error) {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -55,11 +56,14 @@ func (p *PostgresStorage) InsertUser(ctx context.Context, user models.User) erro
 	query := `INSERT INTO users (username, password, created_at) VALUES (@name, @pass, @created_at)`
 	args := pgx.NamedArgs{"name": user.Name, "pass": user.Hash, "created_at": time.Now()}
 	if _, err := tx.Exec(ctx, query, args); err != nil {
-		tx.Rollback(ctx)
+		err = errors.Join(err, tx.Rollback(ctx))
 		return err
 	}
-	defer tx.Commit(ctx)
-	return nil
+	defer func() {
+		err = errors.Join(err, tx.Commit(ctx))
+	}()
+
+	return
 }
 
 func (p *PostgresStorage) GetUser(ctx context.Context, username string) (models.User, error) {
@@ -81,10 +85,12 @@ func (p *PostgresStorage) UpdateUser(ctx context.Context, user models.User) erro
 
 	args := p.toNamedArgs(user)
 	if _, err := tx.Exec(ctx, "UPDATE users SET password=@pass WHERE username = @name", args); err != nil {
-		tx.Rollback(ctx)
+		err = errors.Join(err, tx.Rollback(ctx))
 		return err
 	}
-	defer tx.Commit(ctx)
+	defer func() {
+		err = errors.Join(err, tx.Commit(ctx))
+	}()
 
 	return err
 }
@@ -103,7 +109,7 @@ func (p *PostgresStorage) GetOrders(ctx context.Context, username string) ([]mod
 	rows, err := tx.Query(ctx, query, username)
 	if err != nil {
 		fmt.Printf("error getting orders: %v\n", err)
-		tx.Rollback(ctx)
+		err = errors.Join(err, tx.Rollback(ctx))
 		return nil, err
 	}
 
@@ -124,7 +130,7 @@ func (p *PostgresStorage) GetOrder(ctx context.Context, orderID string) (*models
 	var order models.Order
 	err = tx.QueryRow(ctx, query, orderID).Scan(&order.OrderID, &order.Status, &order.Accrual, &order.UploadedAt, &order.Username)
 	if err != nil {
-		tx.Rollback(ctx)
+		err = errors.Join(err, tx.Rollback(ctx))
 		return nil, err
 	}
 
@@ -144,11 +150,12 @@ func (p *PostgresStorage) PostOrder(ctx context.Context, order *models.Order) (*
     accrual = @accrual`
 
 	if _, err := tx.Exec(ctx, query, order.ToNamedArgs()); err != nil {
-		tx.Rollback(ctx)
+		err = errors.Join(err, tx.Rollback(ctx))
 		return nil, err
 	}
-	defer tx.Commit(ctx)
-
+	defer func() {
+		err = errors.Join(err, tx.Commit(ctx))
+	}()
 	return order, nil
 
 }

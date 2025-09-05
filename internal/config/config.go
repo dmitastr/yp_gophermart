@@ -1,0 +1,56 @@
+package config
+
+import (
+	"errors"
+	"flag"
+	"fmt"
+	_ "log"
+	_ "strings"
+
+	"github.com/spf13/viper"
+)
+
+type Config struct {
+	Address        string `mapstructure:"RUN_ADDRESS"`
+	DatabaseURI    string `mapstructure:"DATABASE_URI"`
+	AccrualAddress string `mapstructure:"ACCRUAL_SYSTEM_ADDRESS"`
+	Key            string `mapstructure:"KEY"`
+}
+
+func LoadConfig() (config *Config, err error) {
+	address := flag.String("a", "", "The address to listen on for HTTP requests.")
+	databaseURI := flag.String("d", "", "The database URI to use")
+	accrualAddress := flag.String("r", "", "The accrual address")
+	flag.Parse()
+
+	v := viper.New()
+
+	v.AddConfigPath("./config")
+	v.SetConfigName("gophermart_app")
+	v.SetConfigType("env")
+
+	v.AutomaticEnv()
+
+	err = v.ReadInConfig()
+
+	if err != nil && !errors.Is(err, viper.ConfigFileNotFoundError{}) {
+		return
+	}
+
+	err = v.Unmarshal(&config)
+	if err != nil {
+		return
+	}
+	fmt.Printf("Read config=%v\n", config)
+	if *address != "" {
+		config.Address = *address
+	}
+	if *databaseURI != "" {
+		config.DatabaseURI = *databaseURI
+	}
+	if *accrualAddress != "" {
+		config.AccrualAddress = *accrualAddress
+	}
+
+	return config, nil
+}

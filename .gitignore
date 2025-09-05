@@ -21,3 +21,8 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+
+# Config files
+config/*
+!config/gophermart_app.env
+
