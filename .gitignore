@@ -23,4 +23,6 @@ vendor/
 .vscode
 
 # Config files
-config/
+config/*
+!config/gophermart_app.env
+

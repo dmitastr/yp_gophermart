@@ -1,0 +1,51 @@
+run:
+  # Maximum number of issues to print.
+  issues-exit-code: 3
+
+linters-settings:
+  govet:
+    # Report about shadowed variables.
+    check-shadowing: true
+  errcheck:
+    # Report about unchecked errors in test files.
+    check-tests: true
+  staticcheck:
+    # Exclude specific checks (e.g., SA1019 for deprecated functions).
+    checks: ["all", "-SA1019"]
+  gocritic:
+    # Disable specific rules.
+    disable:
+      - ifElseChain
+      - exitAfterDefer
+
+linters:
+  # Enable specific linters.
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - gocritic
+    - ineffassign
+    - unparam
+    - misspell
+    - prealloc
+    - gosec
+
+
+issues:
+  # Exclude specific files or patterns from linting.
+  exclude-use-default: false
+  exclude:
+    - ".*\\.pb\\.go$" # Exclude generated protobuf files
+    - ".*_test\\.go$" # Exclude test files from some checks if desired
+  # Don't show issues from excluded linters.
+  exclude-rules:
+    - text: "shadow: declaration of .* shadows declaration at"
+      linters:
+        - govet
+    - text: "Error return value of .*(Close|Copy|Write|Read) is not checked"
+      linters:
+        - errcheck
+    - text: "Naked return in a function"
+      linters:
+        - nakedret
