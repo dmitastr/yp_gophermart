@@ -1,8 +1,11 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"fmt"
+	_ "log"
+	_ "strings"
 
 	"github.com/spf13/viper"
 )
@@ -23,13 +26,14 @@ func LoadConfig() (config *Config, err error) {
 	v := viper.New()
 
 	v.AddConfigPath("./config")
-	v.SetConfigName("app")
+	v.SetConfigName("gophermart_app")
 	v.SetConfigType("env")
 
 	v.AutomaticEnv()
 
 	err = v.ReadInConfig()
-	if err != nil {
+
+	if err != nil && !errors.Is(err, viper.ConfigFileNotFoundError{}) {
 		return
 	}
 
@@ -48,5 +52,5 @@ func LoadConfig() (config *Config, err error) {
 		config.AccrualAddress = *accrualAddress
 	}
 
-	return
+	return config, nil
 }

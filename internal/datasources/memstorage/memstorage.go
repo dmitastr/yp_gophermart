@@ -15,18 +15,18 @@ type MemStorage struct {
 	data map[string]string
 }
 
-func NewMemStorage(cfg *config.Config) *MemStorage {
+func NewMemStorage(_ *config.Config) *MemStorage {
 	return &MemStorage{data: make(map[string]string)}
 }
 
 func (m *MemStorage) InsertUser(ctx context.Context, user models.User) error {
 	if _, ok := m.data[user.Name]; ok {
-		return serviceErrors.ErrorUserExists
+		return serviceErrors.ErrUserExists
 	}
 	return m.UpdateUser(ctx, user)
 }
 
-func (m *MemStorage) UpdateUser(ctx context.Context, user models.User) error {
+func (m *MemStorage) UpdateUser(_ context.Context, user models.User) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -34,7 +34,7 @@ func (m *MemStorage) UpdateUser(ctx context.Context, user models.User) error {
 	return nil
 }
 
-func (m *MemStorage) GetUser(ctx context.Context, username string) (models.User, error) {
+func (m *MemStorage) GetUser(_ context.Context, username string) (models.User, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	hash, ok := m.data[username]

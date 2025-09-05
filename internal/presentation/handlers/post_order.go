@@ -37,6 +37,11 @@ func (h *PostOrder) Handle(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})
 		return
 	}
+	usernameString, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})
+	}
+
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": "bad request"})
@@ -49,10 +54,10 @@ func (h *PostOrder) Handle(c *gin.Context) {
 		return
 	}
 
-	order := models.NewOrder(orderID, username.(string))
+	order := models.NewOrder(orderID, usernameString)
 	order, err, exist := h.service.PostOrder(c, order)
 
-	if errors.Is(err, serviceErrors.ErrorOrderIDAlreadyExists) {
+	if errors.Is(err, serviceErrors.ErrOrderIDAlreadyExists) {
 		fmt.Printf("order id=%s was already uploaded by different user", orderID)
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return

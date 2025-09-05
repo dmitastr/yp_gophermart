@@ -2,6 +2,7 @@ package accrualclient
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -41,7 +42,10 @@ func (a *AccrualClient) GetOrder(ctx context.Context, orderID string) (order *mo
 	if err != nil {
 		return nil, 0, fmt.Errorf("error decoding response: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		err = errors.Join(err, resp.Body.Close())
+	}()
 
 	order.SetOrderID(orderID)
 	statusCode = resp.StatusCode
