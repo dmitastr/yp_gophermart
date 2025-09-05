@@ -80,7 +80,6 @@ func (g *GophermartService) workerStart(ctx context.Context, workerID int) {
 		j := <-g.queue
 		orderID := j.order.OrderID
 		result := WorkerResult{Order: j.order}
-		ctx := context.Background()
 
 		order, statusCode, err := g.client.GetOrder(ctx, orderID)
 		result.Code = statusCode
@@ -191,22 +190,22 @@ func (g *GophermartService) IssueJWT(user models.User) (string, error) {
 	return tok.SignedString(g.key)
 }
 
-func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) (*models.Order, error, bool) {
+func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) (*models.Order, error, bool, int) {
 	fmt.Printf("post order=%s into db\n", order.OrderID)
 	existedOrder, _ := g.db.GetOrder(ctx, order.OrderID)
 	if existedOrder != nil {
 		if existedOrder.Username != order.Username {
 			fmt.Printf("order id=%s already in db\n", order.OrderID)
-			return nil, serviceErrors.ErrOrderIDAlreadyExists, false
+			return nil, serviceErrors.ErrOrderIDAlreadyExists, false, http.StatusConflict
 		}
-		return existedOrder, nil, true
+		return existedOrder, nil, true, http.StatusOK
 	}
 	ch, err := g.AddJob(ctx, order)
 	if err != nil {
-		return nil, err, false
+		return nil, err, false, http.StatusInternalServerError
 	}
 	result := <-ch
-	return result.Order, result.Err, false
+	return result.Order, result.Err, false, result.Code
 }
 
 func (g *GophermartService) VerifyJWT(token string) (jwt.Claims, error) {
