@@ -20,12 +20,17 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type job struct {
+	order *models.Order
+	count int
+}
+
 type GophermartService struct {
 	db           datasources.Database
 	key          []byte
 	caller       caller.Caller
 	mu           sync.Mutex
-	pollQueue    map[string]*models.Order
+	pollQueue    map[string]*job
 	pollInterval time.Duration
 }
 
@@ -33,7 +38,7 @@ func NewGophermartService(cfg *config.Config, db datasources.Database) *Gopherma
 	g := &GophermartService{
 		db:           db,
 		pollInterval: time.Second * 1,
-		pollQueue:    make(map[string]*models.Order),
+		pollQueue:    make(map[string]*job),
 		caller:       accrualcaller.NewAccrualCaller(cfg),
 	}
 	g.GenerateSecretKey(cfg.Key)
@@ -100,15 +105,16 @@ func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) 
 		}
 		return existedOrder, nil, true
 	}
-	newOrder, err := g.updateOrder(ctx, order)
+	newOrder, err := g.updateOrder(ctx, &job{order: order, count: 1})
 	return newOrder, err, false
 }
 
-func (g *GophermartService) updateOrder(ctx context.Context, order *models.Order) (*models.Order, error) {
+func (g *GophermartService) updateOrder(ctx context.Context, orderJob *job) (*models.Order, error) {
 	g.mu.Lock()
-	delete(g.pollQueue, order.OrderID)
+	delete(g.pollQueue, orderJob.order.OrderID)
 	g.mu.Unlock()
 
+	order := orderJob.order
 	respChan, err := g.caller.AddJob(order.OrderID)
 	if err != nil {
 		return nil, err
@@ -123,7 +129,7 @@ func (g *GophermartService) updateOrder(ctx context.Context, order *models.Order
 	if result.Code == http.StatusOK || result.Code == http.StatusNoContent {
 		if _, ok := g.pollQueue[newOrder.OrderID]; !ok && !newOrder.IsFinal() {
 			fmt.Printf("add %s to poll queue\n", order.OrderID)
-			g.pollQueue[newOrder.OrderID] = newOrder
+			g.pollQueue[newOrder.OrderID] = &job{order: newOrder, count: orderJob.count + 1}
 		}
 
 		newOrder.Username = order.Username
@@ -177,11 +183,13 @@ func (g *GophermartService) GenerateSecretKey(key string) {
 
 func (g *GophermartService) startPolling() {
 	for range time.Tick(g.pollInterval) {
-		for _, order := range g.pollQueue {
-			go func() {
-				fmt.Printf("polling order %s\n", order.OrderID)
-				_, _ = g.updateOrder(context.Background(), order)
-			}()
+		for _, j := range g.pollQueue {
+			if j.count < 5 {
+				go func() {
+					fmt.Printf("polling order %s\n", j.order.OrderID)
+					_, _ = g.updateOrder(context.Background(), j)
+				}()
+			}
 		}
 	}
 }
