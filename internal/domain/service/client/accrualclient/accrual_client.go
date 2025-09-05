@@ -34,7 +34,9 @@ func (a *AccrualClient) GetOrder(ctx context.Context, orderID string) (order *mo
 		return nil, 0, fmt.Errorf("error executing request: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode == http.StatusNoContent {
+		return order, resp.StatusCode, nil
+	} else if resp.StatusCode != http.StatusOK {
 		return nil, resp.StatusCode, fmt.Errorf("error executing request: %s", resp.Status)
 	}
 

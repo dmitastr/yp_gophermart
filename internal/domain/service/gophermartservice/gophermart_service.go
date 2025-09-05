@@ -2,6 +2,7 @@ package gophermartservice
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,38 +13,133 @@ import (
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/datasources"
-	"github.com/dmitastr/yp_gophermart/internal/domain/api_caller/caller"
-	"github.com/dmitastr/yp_gophermart/internal/domain/api_caller/caller/accrualcaller"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/client"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/client/accrualclient"
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
+type WorkerResult struct {
+	Order *models.Order
+	Code  int
+	Err   error
+}
+
 type job struct {
-	order *models.Order
-	count int
+	order    *models.Order
+	count    int
+	do       bool
+	respChan chan WorkerResult
 }
 
 type GophermartService struct {
 	db           datasources.Database
 	key          []byte
-	caller       caller.Caller
+	client       client.Client
 	mu           sync.Mutex
 	pollQueue    map[string]*job
 	pollInterval time.Duration
+	workersNum   int
+	queue        chan job
+	jobResults   map[string][]chan WorkerResult
 }
 
-func NewGophermartService(cfg *config.Config, db datasources.Database) *GophermartService {
+func NewGophermartService(ctx context.Context, cfg *config.Config, db datasources.Database) *GophermartService {
 	g := &GophermartService{
 		db:           db,
 		pollInterval: time.Second * 1,
 		pollQueue:    make(map[string]*job),
-		caller:       accrualcaller.NewAccrualCaller(cfg),
+		workersNum:   10,
+		client:       accrualclient.NewAccrualClient(cfg.AccrualAddress),
+		queue:        make(chan job),
+		jobResults:   make(map[string][]chan WorkerResult),
 	}
 	g.GenerateSecretKey(cfg.Key)
-	go g.startPolling()
+	g.start(ctx)
+	go g.startPolling(ctx)
 	return g
+}
+
+func (g *GophermartService) start(ctx context.Context) {
+	for id := range g.workersNum {
+		go g.workerStart(ctx, id)
+	}
+}
+
+func (g *GophermartService) workerStart(ctx context.Context, workerID int) {
+	fmt.Println("Starting worker", workerID)
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("Stopping worker", workerID)
+			return
+		default:
+		}
+		j := <-g.queue
+		orderID := j.order.OrderID
+		result := WorkerResult{Order: j.order}
+		ctx := context.Background()
+
+		order, statusCode, err := g.client.GetOrder(ctx, orderID)
+		result.Code = statusCode
+		result.Err = err
+
+		if err == nil && (statusCode == http.StatusOK || statusCode == http.StatusNoContent) {
+			j.order.Status = models.StatusNew
+			if order != nil {
+				j.order.Status = order.Status
+				j.order.Accrual = order.Accrual
+			}
+
+			g.mu.Lock()
+			if _, ok := g.pollQueue[orderID]; !ok {
+				g.pollQueue[j.order.OrderID] = &job{order: j.order}
+			}
+
+			if !j.order.IsFinal() {
+				fmt.Printf("add %s to poll queue\n", j.order.OrderID)
+				g.pollQueue[j.order.OrderID].count = g.pollQueue[j.order.OrderID].count + 1
+				g.pollQueue[j.order.OrderID].do = true
+			} else {
+				g.pollQueue[j.order.OrderID].do = false
+			}
+			g.mu.Unlock()
+
+			_, err := g.db.PostOrder(ctx, j.order)
+			result.Err = err
+		}
+
+		g.mu.Lock()
+		waiters := g.jobResults[orderID]
+		delete(g.jobResults, orderID)
+		g.mu.Unlock()
+
+		for _, w := range waiters {
+			w <- result
+		}
+	}
+}
+
+func (g *GophermartService) AddJob(ctx context.Context, order *models.Order) (chan WorkerResult, error) {
+	respChan := make(chan WorkerResult)
+	if waiters, ok := g.jobResults[order.OrderID]; ok {
+		g.jobResults[order.OrderID] = append(waiters, respChan)
+		return respChan, nil
+	}
+
+	g.jobResults[order.OrderID] = []chan WorkerResult{respChan}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case g.queue <- job{order: order, respChan: respChan}:
+		return respChan, nil
+	default:
+		delete(g.jobResults, order.OrderID)
+		close(respChan)
+		return nil, errors.New("job queue is full")
+	}
 }
 
 func (g *GophermartService) RegisterUser(ctx context.Context, user models.User) (string, error) {
@@ -105,45 +201,13 @@ func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) 
 		}
 		return existedOrder, nil, true
 	}
-	newOrder, err := g.updateOrder(ctx, &job{order: order, count: 1})
-	return newOrder, err, false
-}
-
-func (g *GophermartService) updateOrder(ctx context.Context, orderJob *job) (*models.Order, error) {
-	g.mu.Lock()
-	delete(g.pollQueue, orderJob.order.OrderID)
-	g.mu.Unlock()
-
-	order := orderJob.order
-	respChan, err := g.caller.AddJob(order.OrderID)
+	ch, err := g.AddJob(ctx, order)
 	if err != nil {
-		return nil, err
+		return nil, err, false
 	}
-	result := <-respChan
-	newOrder := result.Order
-
-	if newOrder == nil {
-		newOrder = &models.Order{}
-	}
-
-	if result.Code == http.StatusOK || result.Code == http.StatusNoContent {
-		if _, ok := g.pollQueue[newOrder.OrderID]; !ok && !newOrder.IsFinal() {
-			fmt.Printf("add %s to poll queue\n", order.OrderID)
-			g.pollQueue[newOrder.OrderID] = &job{order: newOrder, count: orderJob.count + 1}
-		}
-
-		newOrder.Username = order.Username
-		newOrder.OrderID = order.OrderID
-		newOrder.UploadedAt = time.Now()
-		if newOrder.Status == "" {
-			newOrder.Status = models.StatusNew
-		}
-
-		return g.db.PostOrder(ctx, newOrder)
-	}
-
-	return nil, result.Err
-
+	result := <-ch
+	fmt.Printf("post order=%v into db\n", order)
+	return result.Order, result.Err, false
 }
 
 func (g *GophermartService) VerifyJWT(token string) (jwt.Claims, error) {
@@ -181,13 +245,24 @@ func (g *GophermartService) GenerateSecretKey(key string) {
 	g.key = []byte(key)
 }
 
-func (g *GophermartService) startPolling() {
+func (g *GophermartService) startPolling(ctx context.Context) {
 	for range time.Tick(g.pollInterval) {
-		for _, j := range g.pollQueue {
-			if j.count < 5 {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		g.mu.Lock()
+		jobs := g.pollQueue
+		g.pollQueue = make(map[string]*job)
+		g.mu.Unlock()
+
+		for _, j := range jobs {
+			if j.count < 20 && j.do {
 				go func() {
 					fmt.Printf("polling order %s\n", j.order.OrderID)
-					_, _ = g.updateOrder(context.Background(), j)
+					_, _ = g.AddJob(ctx, j.order)
 				}()
 			}
 		}

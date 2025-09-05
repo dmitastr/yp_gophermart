@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
-	"github.com/dmitastr/yp_gophermart/internal/domain/api_caller/client"
-	"github.com/dmitastr/yp_gophermart/internal/domain/api_caller/client/accrualclient"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/client"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/client/accrualclient"
 	"golang.org/x/net/context"
 )
 
