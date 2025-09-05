@@ -22,7 +22,11 @@ func (h *GetOrders) Handle(c *gin.Context) {
 		return
 	}
 
-	orders, err := h.service.GetOrders(c, username.(string))
+	usernameString, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})
+	}
+	orders, err := h.service.GetOrders(c, usernameString)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

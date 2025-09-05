@@ -25,7 +25,7 @@ func (l Login) Handle(c *gin.Context) {
 		return
 	}
 	err := l.service.LoginUser(c, user)
-	if errors.Is(err, serviceErrors.ErrorBadUserPassword) {
+	if errors.Is(err, serviceErrors.ErrBadUserPassword) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	} else if err != nil {
