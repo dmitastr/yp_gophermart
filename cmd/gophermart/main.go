@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/dmitastr/yp_gophermart/internal/app"
 	"github.com/dmitastr/yp_gophermart/internal/config"
+	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
 )
@@ -21,7 +21,7 @@ func main() {
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
 		<-c
-		fmt.Println("\nReceived an interrupt, shutting down...")
+		logger.Info("\nReceived an interrupt, shutting down...")
 		cancel()
 	}()
 
@@ -30,7 +30,7 @@ func main() {
 		log.Fatal(err)
 	}
 	server := app.Init(ctx, cfg)
-	fmt.Printf("server=%s, database=%s, accrualAddr=%s\n", cfg.Address, cfg.DatabaseURI, cfg.AccrualAddress)
+	logger.Infof("server=%s, database=%s, accrualAddr=%s\n", cfg.Address, cfg.DatabaseURI, cfg.AccrualAddress)
 
 	g, gCtx := errgroup.WithContext(ctx)
 	g.Go(func() error {
@@ -42,7 +42,7 @@ func main() {
 	})
 
 	if err := g.Wait(); err != nil {
-		fmt.Printf("exit reason: %s \n", err)
+		logger.Errorf("exit reason: %v", err)
 	}
 
 }

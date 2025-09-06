@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service"
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
+	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/theplant/luhn"
 )
@@ -60,11 +60,11 @@ func (h *PostOrder) Handle(c *gin.Context) {
 	err = result.Err
 
 	if errors.Is(err, serviceErrors.ErrOrderIDAlreadyExists) {
-		fmt.Printf("order id=%s was already uploaded by different user\n", orderID)
+		logger.Errorf("order id=%s was already uploaded by different user\n", orderID)
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	} else if err != nil {
-		fmt.Printf("error posting order with order id=%s, err=%v\n", orderID, err)
+		logger.Errorf("error posting order with order id=%s, err=%v\n", orderID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

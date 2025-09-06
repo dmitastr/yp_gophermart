@@ -16,6 +16,7 @@ import (
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/client"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/client/accrualclient"
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
+	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -140,23 +141,26 @@ func (g *GophermartService) GenerateSecretKey(key string) {
 }
 
 func (g *GophermartService) startPolling(ctx context.Context) {
-	for range time.Tick(g.pollInterval) {
+	ticker := time.NewTicker(g.pollInterval)
+	defer ticker.Stop()
+
+	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
-		}
+		case <-ticker.C:
+			jobs := g.jobResults
+			g.jobResults = make(map[string]*job)
 
-		jobs := g.jobResults
-		g.jobResults = make(map[string]*job)
-
-		for _, j := range jobs {
-			result := g.updateOrder(ctx, j.order)
-			for _, w := range j.waiters {
-				w <- result
-				close(w)
+			for _, j := range jobs {
+				result := g.updateOrder(ctx, j.order)
+				for _, w := range j.waiters {
+					w <- result
+					close(w)
+				}
 			}
 		}
+
 	}
 }
 
@@ -189,11 +193,11 @@ func (g *GophermartService) AddJob(_ context.Context, order *models.Order) (chan
 }
 
 func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) (*WorkerResult, bool) {
-	fmt.Printf("post order=%s into db\n", order.OrderID)
+	logger.Infof("post order=%s into db\n", order.OrderID)
 	existedOrder, _ := g.db.GetOrder(ctx, order.OrderID)
 	if existedOrder != nil {
 		if existedOrder.Username != order.Username {
-			fmt.Printf("order id=%s already in db\n", order.OrderID)
+			logger.Infof("order id=%s already in db\n", order.OrderID)
 			return &WorkerResult{Err: serviceErrors.ErrOrderIDAlreadyExists}, false
 		}
 		return &WorkerResult{Order: existedOrder, Err: nil, Code: http.StatusOK}, true
