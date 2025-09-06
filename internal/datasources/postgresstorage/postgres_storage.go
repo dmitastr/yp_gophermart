@@ -68,6 +68,10 @@ func (p *PostgresStorage) InsertUser(ctx context.Context, user models.User) (err
 
 func (p *PostgresStorage) GetUser(ctx context.Context, username string) (models.User, error) {
 	tx, err := p.pool.Begin(ctx)
+	defer func() {
+		_ = tx.Commit(ctx)
+	}()
+
 	if err != nil {
 		return models.User{}, err
 	}
@@ -97,6 +101,9 @@ func (p *PostgresStorage) UpdateUser(ctx context.Context, user models.User) erro
 
 func (p *PostgresStorage) GetOrders(ctx context.Context, username string) ([]models.Order, error) {
 	tx, err := p.pool.Begin(ctx)
+	defer func() {
+		_ = tx.Commit(ctx)
+	}()
 	if err != nil {
 		return nil, err
 	}
@@ -118,6 +125,10 @@ func (p *PostgresStorage) GetOrders(ctx context.Context, username string) ([]mod
 
 func (p *PostgresStorage) GetOrder(ctx context.Context, orderID string) (*models.Order, error) {
 	tx, err := p.pool.Begin(ctx)
+	defer func() {
+		_ = tx.Commit(ctx)
+	}()
+
 	if err != nil {
 		return nil, err
 	}
