@@ -24,7 +24,7 @@ type Order struct {
 }
 
 func NewOrder(orderID string, username string) *Order {
-	return &Order{OrderID: orderID, UploadedAt: time.Now(), Username: username}
+	return &Order{OrderID: orderID, UploadedAt: time.Now(), Username: username, Status: StatusNew}
 }
 
 func (order *Order) ToNamedArgs() pgx.NamedArgs {

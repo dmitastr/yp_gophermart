@@ -2,7 +2,6 @@ package gophermartservice
 
 import (
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -28,10 +27,8 @@ type WorkerResult struct {
 }
 
 type job struct {
-	order    *models.Order
-	count    int
-	do       bool
-	respChan chan WorkerResult
+	order   *models.Order
+	waiters []chan *WorkerResult
 }
 
 type GophermartService struct {
@@ -39,106 +36,23 @@ type GophermartService struct {
 	key          []byte
 	client       client.Client
 	mu           sync.Mutex
-	pollQueue    map[string]*job
 	pollInterval time.Duration
 	workersNum   int
-	queue        chan job
-	jobResults   map[string][]chan WorkerResult
+	jobResults   map[string]*job
 }
 
 func NewGophermartService(ctx context.Context, cfg *config.Config, db datasources.Database) *GophermartService {
 	g := &GophermartService{
 		db:           db,
 		pollInterval: time.Second * 1,
-		pollQueue:    make(map[string]*job),
-		workersNum:   10,
+		workersNum:   3,
 		client:       accrualclient.NewAccrualClient(cfg.AccrualAddress),
-		queue:        make(chan job),
-		jobResults:   make(map[string][]chan WorkerResult),
+		jobResults:   make(map[string]*job),
 	}
 	g.GenerateSecretKey(cfg.Key)
-	g.start(ctx)
-	// go g.startPolling(ctx)
+	// g.start(ctx)
+	go g.startPolling(ctx)
 	return g
-}
-
-func (g *GophermartService) start(ctx context.Context) {
-	for id := range g.workersNum {
-		go g.workerStart(ctx, id)
-	}
-}
-
-func (g *GophermartService) workerStart(ctx context.Context, workerID int) {
-	fmt.Println("Starting worker", workerID)
-	for {
-		select {
-		case <-ctx.Done():
-			fmt.Println("Stopping worker", workerID)
-			return
-		default:
-		}
-		j := <-g.queue
-		orderID := j.order.OrderID
-		result := WorkerResult{Order: j.order}
-
-		order, statusCode, err := g.client.GetOrder(ctx, orderID)
-		result.Code = statusCode
-		result.Err = err
-
-		if err == nil && (statusCode == http.StatusOK || statusCode == http.StatusNoContent) {
-			j.order.Status = models.StatusNew
-			if order != nil {
-				j.order.Status = order.Status
-				j.order.Accrual = order.Accrual
-			}
-
-			g.mu.Lock()
-			if _, ok := g.pollQueue[orderID]; !ok {
-				g.pollQueue[j.order.OrderID] = &job{order: j.order}
-			}
-
-			if !j.order.IsFinal() {
-				fmt.Printf("add %s to poll queue\n", j.order.OrderID)
-				g.pollQueue[j.order.OrderID].count = g.pollQueue[j.order.OrderID].count + 1
-				g.pollQueue[j.order.OrderID].do = true
-			} else {
-				g.pollQueue[j.order.OrderID].do = false
-			}
-			g.mu.Unlock()
-
-			_, err := g.db.PostOrder(ctx, j.order)
-			result.Err = err
-		}
-
-		g.mu.Lock()
-		waiters := g.jobResults[orderID]
-		delete(g.jobResults, orderID)
-		g.mu.Unlock()
-
-		for _, w := range waiters {
-			w <- result
-		}
-	}
-}
-
-func (g *GophermartService) AddJob(ctx context.Context, order *models.Order) (chan WorkerResult, error) {
-	respChan := make(chan WorkerResult)
-	if waiters, ok := g.jobResults[order.OrderID]; ok {
-		g.jobResults[order.OrderID] = append(waiters, respChan)
-		return respChan, nil
-	}
-
-	g.jobResults[order.OrderID] = []chan WorkerResult{respChan}
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case g.queue <- job{order: order, respChan: respChan}:
-		return respChan, nil
-	default:
-		delete(g.jobResults, order.OrderID)
-		close(respChan)
-		return nil, errors.New("job queue is full")
-	}
 }
 
 func (g *GophermartService) RegisterUser(ctx context.Context, user models.User) (string, error) {
@@ -190,24 +104,6 @@ func (g *GophermartService) IssueJWT(user models.User) (string, error) {
 	return tok.SignedString(g.key)
 }
 
-func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) (*models.Order, error, bool, int) {
-	fmt.Printf("post order=%s into db\n", order.OrderID)
-	existedOrder, _ := g.db.GetOrder(ctx, order.OrderID)
-	if existedOrder != nil {
-		if existedOrder.Username != order.Username {
-			fmt.Printf("order id=%s already in db\n", order.OrderID)
-			return nil, serviceErrors.ErrOrderIDAlreadyExists, false, http.StatusConflict
-		}
-		return existedOrder, nil, true, http.StatusOK
-	}
-	ch, err := g.AddJob(ctx, order)
-	if err != nil {
-		return nil, err, false, http.StatusInternalServerError
-	}
-	result := <-ch
-	return result.Order, result.Err, false, result.Code
-}
-
 func (g *GophermartService) VerifyJWT(token string) (jwt.Claims, error) {
 	jwtToken, err := jwt.ParseWithClaims(token, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if token.Method.Alg() != "HS256" {
@@ -251,18 +147,62 @@ func (g *GophermartService) startPolling(ctx context.Context) {
 		default:
 		}
 
-		g.mu.Lock()
-		jobs := g.pollQueue
-		g.pollQueue = make(map[string]*job)
-		g.mu.Unlock()
+		jobs := g.jobResults
+		g.jobResults = make(map[string]*job)
 
 		for _, j := range jobs {
-			if j.count < 20 && j.do {
-				go func() {
-					fmt.Printf("polling order %s\n", j.order.OrderID)
-					_, _ = g.AddJob(ctx, j.order)
-				}()
+			result := g.updateOrder(ctx, j.order)
+			for _, w := range j.waiters {
+				w <- result
+				close(w)
 			}
 		}
 	}
+}
+
+func (g *GophermartService) updateOrder(ctx context.Context, order *models.Order) *WorkerResult {
+	newOrder, statusCode, err := g.client.GetOrder(ctx, order.OrderID)
+
+	if newOrder != nil {
+		order.Status = newOrder.Status
+		order.Accrual = newOrder.Accrual
+	}
+
+	_, _ = g.db.PostOrder(ctx, order)
+
+	if !order.IsFinal() {
+		_, _ = g.AddJob(ctx, order)
+	}
+
+	return &WorkerResult{Order: order, Code: statusCode, Err: err}
+}
+
+func (g *GophermartService) AddJob(_ context.Context, order *models.Order) (chan *WorkerResult, error) {
+	respChan := make(chan *WorkerResult, 1)
+	if j, ok := g.jobResults[order.OrderID]; ok {
+		g.jobResults[order.OrderID].waiters = append(j.waiters, respChan)
+		return respChan, nil
+	}
+
+	g.jobResults[order.OrderID] = &job{order: order, waiters: []chan *WorkerResult{respChan}}
+	return respChan, nil
+}
+
+func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) (*WorkerResult, bool) {
+	fmt.Printf("post order=%s into db\n", order.OrderID)
+	existedOrder, _ := g.db.GetOrder(ctx, order.OrderID)
+	if existedOrder != nil {
+		if existedOrder.Username != order.Username {
+			fmt.Printf("order id=%s already in db\n", order.OrderID)
+			return &WorkerResult{Err: serviceErrors.ErrOrderIDAlreadyExists}, false
+		}
+		return &WorkerResult{Order: existedOrder, Err: nil, Code: http.StatusOK}, true
+	}
+
+	ch, err := g.AddJob(ctx, order)
+	if err != nil {
+		return &WorkerResult{Err: err}, false
+	}
+	result := <-ch
+	return result, false
 }
