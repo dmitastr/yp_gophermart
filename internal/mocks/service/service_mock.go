@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	models "github.com/dmitastr/yp_gophermart/internal/domain/models"
+	gophermartservice "github.com/dmitastr/yp_gophermart/internal/domain/service/gophermartservice"
 	jwt "github.com/golang-jwt/jwt/v5"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -81,14 +82,12 @@ func (mr *MockServiceMockRecorder) LoginUser(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // PostOrder mocks base method.
-func (m *MockService) PostOrder(arg0 context.Context, arg1 *models.Order) (*models.Order, error, bool, int) {
+func (m *MockService) PostOrder(arg0 context.Context, arg1 *models.Order) (*gophermartservice.WorkerResult, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PostOrder", arg0, arg1)
-	ret0, _ := ret[0].(*models.Order)
-	ret1, _ := ret[1].(error)
-	ret2, _ := ret[2].(bool)
-	ret3, _ := ret[3].(int)
-	return ret0, ret1, ret2, ret3
+	ret0, _ := ret[0].(*gophermartservice.WorkerResult)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
 }
 
 // PostOrder indicates an expected call of PostOrder.
