@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
@@ -18,7 +19,9 @@ type AccrualClient struct {
 }
 
 func NewAccrualClient(baseURL string) *AccrualClient {
-	baseURL = "http://" + baseURL
+	if !strings.Contains(baseURL, "http") {
+		baseURL = "http://" + baseURL
+	}
 	return &AccrualClient{baseURL: baseURL, client: &http.Client{Timeout: 10 * time.Second}}
 }
 
@@ -34,7 +37,9 @@ func (a *AccrualClient) GetOrder(ctx context.Context, orderID string) (order *mo
 		return nil, 0, fmt.Errorf("error executing request: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode == http.StatusNoContent {
+		return order, resp.StatusCode, nil
+	} else if resp.StatusCode != http.StatusOK {
 		return nil, resp.StatusCode, fmt.Errorf("error executing request: %s", resp.Status)
 	}
 
@@ -50,5 +55,5 @@ func (a *AccrualClient) GetOrder(ctx context.Context, orderID string) (order *mo
 	order.SetOrderID(orderID)
 	statusCode = resp.StatusCode
 
-	return
+	return order, resp.StatusCode, nil
 }

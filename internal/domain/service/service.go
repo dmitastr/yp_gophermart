@@ -2,6 +2,7 @@ package service
 
 import (
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/gophermartservice"
 	"github.com/golang-jwt/jwt/v5"
 
 	"context"
@@ -13,5 +14,5 @@ type Service interface {
 	IssueJWT(models.User) (string, error)
 	VerifyJWT(string) (jwt.Claims, error)
 	GetOrders(context.Context, string) ([]models.Order, error)
-	PostOrder(context.Context, *models.Order) (*models.Order, error, bool)
+	PostOrder(context.Context, *models.Order) (*gophermartservice.WorkerResult, bool)
 }
