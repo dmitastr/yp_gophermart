@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
@@ -18,7 +19,9 @@ type AccrualClient struct {
 }
 
 func NewAccrualClient(baseURL string) *AccrualClient {
-	baseURL = "http://" + baseURL
+	if !strings.Contains(baseURL, "http") {
+		baseURL = "http://" + baseURL
+	}
 	return &AccrualClient{baseURL: baseURL, client: &http.Client{Timeout: 10 * time.Second}}
 }
 
