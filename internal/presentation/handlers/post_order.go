@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
@@ -12,7 +11,6 @@ import (
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/theplant/luhn"
 )
 
 type PostOrder struct {
@@ -21,14 +19,6 @@ type PostOrder struct {
 
 func NewPostOrder(service service.Service) *PostOrder {
 	return &PostOrder{service: service}
-}
-
-func (h *PostOrder) IsOrderIDValid(orderID string) bool {
-	orderIDInt, err := strconv.Atoi(orderID)
-	if err != nil {
-		return false
-	}
-	return luhn.Valid(orderIDInt)
 }
 
 func (h *PostOrder) Handle(c *gin.Context) {
@@ -49,12 +39,12 @@ func (h *PostOrder) Handle(c *gin.Context) {
 	}
 
 	orderID := strings.TrimSpace(string(body))
-	if !h.IsOrderIDValid(orderID) {
+	order := models.NewOrder(orderID, usernameString)
+	if !order.IsValid() {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "bad order id"})
 		return
 	}
 
-	order := models.NewOrder(orderID, usernameString)
 	result, exist := h.service.PostOrder(c, order)
 	order = result.Order
 	err = result.Err
