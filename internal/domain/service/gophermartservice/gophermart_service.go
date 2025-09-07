@@ -2,8 +2,6 @@ package gophermartservice
 
 import (
 	"crypto/rand"
-	"database/sql"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -54,7 +52,7 @@ func NewGophermartService(ctx context.Context, cfg *config.Config, db datasource
 	}
 	g.GenerateSecretKey(cfg.Key)
 	// g.start(ctx)
-	// go g.startPolling(ctx)
+	go g.startPolling(ctx)
 	return g
 }
 
@@ -194,7 +192,7 @@ func (g *GophermartService) AddJob(_ context.Context, order *models.Order) (chan
 	return respChan, nil
 }
 
-func (g *GophermartService) PostOrderAsync(ctx context.Context, order *models.Order) (*WorkerResult, bool) {
+func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) (*WorkerResult, bool) {
 	logger.Infof("post order=%s into db\n", order.OrderID)
 	existedOrder, _ := g.db.GetOrder(ctx, order.OrderID)
 	if existedOrder != nil {
@@ -211,34 +209,4 @@ func (g *GophermartService) PostOrderAsync(ctx context.Context, order *models.Or
 	}
 	result := <-ch
 	return result, false
-}
-
-func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) (*WorkerResult, bool) {
-	logger.Infof("post order=%s into db\n", order.OrderID)
-	existedOrder, err := g.db.GetOrder(ctx, order.OrderID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		logger.Errorf("error getting order: %v\n", err)
-		return &WorkerResult{Err: fmt.Errorf("cant get order from db: %w", err)}, false
-	}
-
-	if existedOrder != nil {
-		if existedOrder.Username != order.Username {
-			logger.Infof("order id=%s already in db\n", order.OrderID)
-			return &WorkerResult{Err: serviceErrors.ErrOrderIDAlreadyExists}, false
-		}
-		return &WorkerResult{Order: existedOrder, Code: http.StatusOK}, true
-	}
-
-	newOrder, code, err := g.client.GetOrder(ctx, order.OrderID)
-	if newOrder != nil {
-		order.Status = newOrder.Status
-		order.Accrual = newOrder.Accrual
-	}
-
-	if _, err := g.db.PostOrder(ctx, order); err != nil {
-		logger.Errorf("error saving new order: %v\n", err)
-		return &WorkerResult{Err: fmt.Errorf("error saving new order: %w", err)}, false
-	}
-
-	return &WorkerResult{Order: order, Code: code}, false
 }
