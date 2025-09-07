@@ -84,10 +84,10 @@ func (g *GophermartService) LoginUser(ctx context.Context, user models.User) err
 }
 
 func (g *GophermartService) GetOrders(ctx context.Context, username string) ([]models.Order, error) {
-	fmt.Printf("getting orders for username=%s\n", username)
+	logger.Infof("getting orders for username=%s\n", username)
 	orders, err := g.db.GetOrders(ctx, username)
 	if err != nil {
-		fmt.Printf("failed to get orders for username=%s, error=%v\n", username, err)
+		logger.Errorf("failed to get orders for username=%s, error=%v\n", username, err)
 		return nil, err
 	}
 
@@ -183,6 +183,10 @@ func (g *GophermartService) updateOrder(ctx context.Context, order *models.Order
 
 func (g *GophermartService) AddJob(_ context.Context, order *models.Order) (chan *WorkerResult, error) {
 	respChan := make(chan *WorkerResult, 1)
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
 	if j, ok := g.jobResults[order.OrderID]; ok {
 		g.jobResults[order.OrderID].waiters = append(j.waiters, respChan)
 		return respChan, nil
