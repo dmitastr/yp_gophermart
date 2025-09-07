@@ -1,9 +1,11 @@
 package models
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/theplant/luhn"
 )
 
 var (
@@ -35,6 +37,14 @@ func (order *Order) ToNamedArgs() pgx.NamedArgs {
 
 func (order *Order) IsFinal() bool {
 	return order.Status == StatusProcessed || order.Status == StatusInvalid
+}
+
+func (order *Order) IsValid() bool {
+	orderIDInt, err := strconv.Atoi(order.OrderID)
+	if err != nil {
+		return false
+	}
+	return luhn.Valid(orderIDInt)
 }
 
 func (order *Order) SetOrderID(orderID string) {

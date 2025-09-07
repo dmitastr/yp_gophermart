@@ -35,8 +35,6 @@ func Init(ctx context.Context, cfg *config.Config) *http.Server {
 	orders.GET("/", handlers.NewGetOrder(service).Handle)
 	orders.POST("/", handlers.NewPostOrder(service).Handle)
 
-	router.GET("/check", authCheck.Handle, handlers.NewCheckHandler(service).Handle)
-
 	server := &http.Server{
 		Addr:              cfg.Address,
 		ReadHeaderTimeout: 5 * time.Second,
