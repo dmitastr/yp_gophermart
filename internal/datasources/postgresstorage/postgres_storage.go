@@ -8,6 +8,7 @@ import (
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
+	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/tracelog"
@@ -31,7 +32,7 @@ func NewPostgresStorage(ctx context.Context, cfg *config.Config) (*PostgresStora
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to db with url=%s: %v", cfg.DatabaseURI, err)
 	}
-	fmt.Println("Database connection established successfully")
+	logger.Infof("Database connection established successfully")
 
 	m, err := migrate.New(
 		"file://database/migrations",
@@ -42,7 +43,7 @@ func NewPostgresStorage(ctx context.Context, cfg *config.Config) (*PostgresStora
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return nil, err
 	}
-	fmt.Println("Database migration succeeded")
+	logger.Infof("Database migration succeeded")
 
 	return &PostgresStorage{pool: pool}, nil
 }
@@ -115,7 +116,7 @@ func (p *PostgresStorage) GetOrders(ctx context.Context, username string) ([]mod
 
 	rows, err := tx.Query(ctx, query, username)
 	if err != nil {
-		fmt.Printf("error getting orders: %v\n", err)
+		logger.Errorf("error getting orders: %v\n", err)
 		err = errors.Join(err, tx.Rollback(ctx))
 		return nil, err
 	}

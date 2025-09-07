@@ -3,10 +3,8 @@ package config
 import (
 	"errors"
 	"flag"
-	"fmt"
-	_ "log"
-	_ "strings"
 
+	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/spf13/viper"
 )
 
@@ -41,7 +39,7 @@ func LoadConfig() (config *Config, err error) {
 	if err != nil {
 		return
 	}
-	fmt.Printf("Read config=%v\n", config)
+	logger.Infof("Read config=%v\n", config)
 	if *address != "" {
 		config.Address = *address
 	}

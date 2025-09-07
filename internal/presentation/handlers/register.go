@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service"
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
+	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -30,7 +30,7 @@ func (r Register) Handle(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	} else if err != nil {
-		fmt.Printf("error while registering user: %v", err)
+		logger.Errorf("error while registering user: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
