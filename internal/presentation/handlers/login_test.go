@@ -11,13 +11,13 @@ import (
 	"testing"
 
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
-	"github.com/dmitastr/yp_gophermart/internal/mocks/service"
+	mockservice "github.com/dmitastr/yp_gophermart/internal/mocks/service"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRegister_Handle(t *testing.T) {
+func TestLogin_Handle(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -40,26 +40,20 @@ func TestRegister_Handle(t *testing.T) {
 			args:       args{payload: []byte(`{"login": "abc", "password": "abc"}`), token: "token"},
 		},
 		{
-			name:       "malformed data",
-			serviceErr: errors.New("some error"),
-			wantStatus: http.StatusBadRequest,
-			args:       args{payload: []byte(`{"abc"}`), token: "token"},
-		},
-		{
-			name:       "duplicated user",
-			serviceErr: serviceErrors.ErrUserExists,
-			wantStatus: http.StatusConflict,
+			name:       "bad user/password pair",
+			serviceErr: serviceErrors.ErrBadUserPassword,
+			wantStatus: http.StatusUnauthorized,
 			args:       args{payload: []byte(`{"login": "abc", "password": "abc"}`), token: "token"},
 		},
 		{
-			name:       "empty register info",
+			name:       "empty login data",
 			serviceErr: nil,
 			wantStatus: http.StatusBadRequest,
-			args:       args{payload: []byte(`{"login": "", "password": ""}`), token: "token"},
+			args:       args{payload: []byte(`{"login": "", "password": "abc"}`), token: "token"},
 		},
 		{
-			name:       "internal server error",
-			serviceErr: errors.New("some error"),
+			name:       "service error",
+			serviceErr: errors.New("service error"),
 			wantStatus: http.StatusInternalServerError,
 			args:       args{payload: []byte(`{"login": "abc", "password": "abc"}`), token: "token"},
 		},
@@ -69,14 +63,14 @@ func TestRegister_Handle(t *testing.T) {
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
 
-			req, _ := http.NewRequest(http.MethodPost, "/api/user/register", io.NopCloser(bytes.NewBuffer(tt.args.payload)))
+			req, _ := http.NewRequest(http.MethodPost, "/api/user/login", io.NopCloser(bytes.NewBuffer(tt.args.payload)))
 			req.Header.Set("Content-Type", "application/json; charset=utf-8")
 			c.Request = req
 
-			mockService := mock_service.NewMockService(ctrl)
-			mockService.EXPECT().RegisterUser(c, gomock.Any()).Return(tt.args.token, tt.serviceErr).AnyTimes()
+			mockService := mockservice.NewMockService(ctrl)
+			mockService.EXPECT().LoginUser(c, gomock.Any()).Return(tt.args.token, tt.serviceErr).AnyTimes()
 
-			Register{service: mockService}.Handle(c)
+			Login{service: mockService}.Handle(c)
 
 			assert.EqualValues(t, tt.wantStatus, w.Code)
 
