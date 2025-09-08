@@ -15,3 +15,7 @@ type User struct {
 func (u *User) ToNamedArgs() pgx.NamedArgs {
 	return pgx.NamedArgs{"name": u.Name, "pass": u.Hash, "created_at": time.Now()}
 }
+
+func (u *User) IsValid() bool {
+	return u.Name != "" && u.Password != ""
+}

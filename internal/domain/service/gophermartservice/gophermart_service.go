@@ -70,17 +70,17 @@ func (g *GophermartService) RegisterUser(ctx context.Context, user models.User) 
 	return token, nil
 }
 
-func (g *GophermartService) LoginUser(ctx context.Context, user models.User) error {
+func (g *GophermartService) LoginUser(ctx context.Context, user models.User) (token string, err error) {
 	userExpected, err := g.db.GetUser(ctx, user.Name)
 	if err != nil {
-		return serviceErrors.ErrDoesNotUserExist
+		return token, serviceErrors.ErrDoesNotUserExist
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(userExpected.Password), []byte(user.Password)); err == nil {
-		return nil
+	if err := bcrypt.CompareHashAndPassword([]byte(userExpected.Password), []byte(user.Password)); err != nil {
+		return token, serviceErrors.ErrBadUserPassword
 	}
 
-	return serviceErrors.ErrBadUserPassword
+	return g.IssueJWT(user)
 }
 
 func (g *GophermartService) GetOrders(ctx context.Context, username string) ([]models.Order, error) {

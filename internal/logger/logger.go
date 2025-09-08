@@ -37,7 +37,7 @@ func Error(message string, fields ...zap.Field) {
 }
 
 func Errorf(message string, fields ...any) {
-	zapLog.Sugar().Errorf(message, fields)
+	zapLog.Sugar().Errorf(message, fields...)
 }
 
 func Fatal(message string, fields ...zap.Field) {
