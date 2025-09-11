@@ -11,11 +11,11 @@ type GetOrders struct {
 	service service.Service
 }
 
-func NewGetOrder(service service.Service) *GetOrders {
+func NewGetOrders(service service.Service) *GetOrders {
 	return &GetOrders{service: service}
 }
 
-func (h *GetOrders) Handle(c *gin.Context) {
+func (h GetOrders) Handle(c *gin.Context) {
 	username, exists := c.Get("username")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})
