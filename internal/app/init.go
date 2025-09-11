@@ -32,7 +32,7 @@ func Init(ctx context.Context, cfg *config.Config) *http.Server {
 	users.POST("/login", handlers.NewLogin(service).Handle)
 
 	orders := users.Group("/orders", authCheck.Handle)
-	orders.GET("/", handlers.NewGetOrder(service).Handle)
+	orders.GET("/", handlers.NewGetOrders(service).Handle)
 	orders.POST("/", handlers.NewPostOrder(service).Handle)
 
 	server := &http.Server{
