@@ -2,15 +2,20 @@ package gophermartservice
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/datasources"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/client"
-	"github.com/golang-jwt/jwt/v5"
+	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
+	mock_database "github.com/dmitastr/yp_gophermart/internal/mocks/database"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGophermartService_AddJob(t *testing.T) {
@@ -60,268 +65,227 @@ func TestGophermartService_AddJob(t *testing.T) {
 }
 
 func TestGophermartService_GetOrders(t *testing.T) {
-	type fields struct {
-		db           datasources.Database
-		key          []byte
-		client       client.Client
-		mu           sync.Mutex
-		pollInterval time.Duration
-		workersNum   int
-		jobResults   map[string]*job
-	}
-	type args struct {
-		ctx      context.Context
-		username string
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    []models.Order
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			g := &GophermartService{
-				db:           tt.fields.db,
-				key:          tt.fields.key,
-				client:       tt.fields.client,
-				mu:           tt.fields.mu,
-				pollInterval: tt.fields.pollInterval,
-				workersNum:   tt.fields.workersNum,
-				jobResults:   tt.fields.jobResults,
-			}
-			got, err := g.GetOrders(tt.args.ctx, tt.args.username)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetOrders() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetOrders() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-func TestGophermartService_IssueJWT(t *testing.T) {
-	type fields struct {
-		db           datasources.Database
-		key          []byte
-		client       client.Client
-		mu           sync.Mutex
-		pollInterval time.Duration
-		workersNum   int
-		jobResults   map[string]*job
-	}
 	type args struct {
-		user models.User
+		username string
+		orders   []models.Order
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    string
-		wantErr bool
+		name  string
+		args  args
+		dbErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name:  "valid input",
+			args:  args{username: "username", orders: []models.Order{{OrderID: "123345"}}},
+			dbErr: false,
+		},
+		{
+			name:  "database error",
+			args:  args{username: "username", orders: []models.Order{{OrderID: "123345"}}},
+			dbErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := &GophermartService{
-				db:           tt.fields.db,
-				key:          tt.fields.key,
-				client:       tt.fields.client,
-				mu:           tt.fields.mu,
-				pollInterval: tt.fields.pollInterval,
-				workersNum:   tt.fields.workersNum,
-				jobResults:   tt.fields.jobResults,
+			ctx := t.Context()
+			cfg := &config.Config{Key: "testingkey"}
+			mockDB := mock_database.NewMockDatabase(ctrl)
+
+			var dbErr error
+			if tt.dbErr {
+				dbErr = errors.New("db error")
 			}
-			got, err := g.IssueJWT(tt.args.user)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("IssueJWT() error = %v, wantErr %v", err, tt.wantErr)
+			g := NewGophermartService(ctx, cfg, mockDB)
+
+			mockDB.EXPECT().GetOrders(ctx, tt.args.username).Return(tt.args.orders, dbErr).Times(1)
+
+			got, err := g.GetOrders(ctx, tt.args.username)
+			if dbErr != nil {
+				assert.Equal(t, dbErr, err)
+				assert.Nil(t, got)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("IssueJWT() got = %v, want %v", got, tt.want)
-			}
+			assert.ElementsMatch(t, tt.args.orders, got)
 		})
 	}
 }
 
 func TestGophermartService_LoginUser(t *testing.T) {
-	type fields struct {
-		db           datasources.Database
-		key          []byte
-		client       client.Client
-		mu           sync.Mutex
-		pollInterval time.Duration
-		workersNum   int
-		jobResults   map[string]*job
-	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	type args struct {
-		ctx  context.Context
-		user models.User
+		username    string
+		password    string
+		isPassEqual bool
 	}
 	tests := []struct {
 		name    string
-		fields  fields
 		args    args
-		wantErr bool
+		wantErr error
+		dbErr   bool
 	}{
-		// TODO: Add test cases.
+		{
+			name:    "valid input",
+			args:    args{username: "username", password: "password", isPassEqual: true},
+			wantErr: nil,
+			dbErr:   false,
+		},
+		{
+			name:    "wrong password",
+			args:    args{username: "username", password: "password", isPassEqual: false},
+			wantErr: serviceErrors.ErrBadUserPassword,
+			dbErr:   false,
+		},
+		{
+			name:    "database error",
+			args:    args{username: "username", password: "password", isPassEqual: true},
+			wantErr: serviceErrors.ErrDoesNotUserExist,
+			dbErr:   true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := &GophermartService{
-				db:           tt.fields.db,
-				key:          tt.fields.key,
-				client:       tt.fields.client,
-				mu:           tt.fields.mu,
-				pollInterval: tt.fields.pollInterval,
-				workersNum:   tt.fields.workersNum,
-				jobResults:   tt.fields.jobResults,
+			ctx := t.Context()
+			cfg := &config.Config{Key: "testingkey"}
+			mockDB := mock_database.NewMockDatabase(ctrl)
+
+			var dbErr error
+			if tt.dbErr {
+				dbErr = tt.wantErr
 			}
-			if _, err := g.LoginUser(tt.args.ctx, tt.args.user); (err != nil) != tt.wantErr {
-				t.Errorf("LoginUser() error = %v, wantErr %v", err, tt.wantErr)
+			g := NewGophermartService(ctx, cfg, mockDB)
+
+			userActual := models.User{Name: tt.args.username, Password: tt.args.password}
+			userExpected := models.User{Name: tt.args.username, Password: tt.args.password}
+			if !tt.args.isPassEqual {
+				userExpected.Password = userActual.Password + "random_string"
 			}
+			userExpected.Password = g.HashGenerate(userExpected.Password)
+
+			mockDB.EXPECT().GetUser(ctx, userActual.Name).Return(userExpected, dbErr).Times(1)
+
+			got, err := g.LoginUser(ctx, userActual)
+			if tt.wantErr != nil {
+				assert.Equal(t, tt.wantErr, err)
+				return
+			}
+			assert.NotEmpty(t, got)
 		})
 	}
 }
 
 func TestGophermartService_PostOrder(t *testing.T) {
-	type fields struct {
-		db           datasources.Database
-		key          []byte
-		client       client.Client
-		mu           sync.Mutex
-		pollInterval time.Duration
-		workersNum   int
-		jobResults   map[string]*job
-	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	type args struct {
-		ctx   context.Context
-		order *models.Order
+		username    string
+		password    string
+		isPassEqual bool
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *WorkerResult
-		want1  bool
+		name    string
+		args    args
+		wantErr error
+		dbErr   bool
 	}{
-		// TODO: Add test cases.
+		{
+			name:    "valid input",
+			args:    args{username: "username", password: "password", isPassEqual: true},
+			wantErr: nil,
+			dbErr:   false,
+		},
+		{
+			name:    "wrong password",
+			args:    args{username: "username", password: "password", isPassEqual: false},
+			wantErr: serviceErrors.ErrBadUserPassword,
+			dbErr:   false,
+		},
+		{
+			name:    "database error",
+			args:    args{username: "username", password: "password", isPassEqual: true},
+			wantErr: serviceErrors.ErrDoesNotUserExist,
+			dbErr:   true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := &GophermartService{
-				db:           tt.fields.db,
-				key:          tt.fields.key,
-				client:       tt.fields.client,
-				mu:           tt.fields.mu,
-				pollInterval: tt.fields.pollInterval,
-				workersNum:   tt.fields.workersNum,
-				jobResults:   tt.fields.jobResults,
+			ctx := t.Context()
+			cfg := &config.Config{Key: "testingkey"}
+			mockDB := mock_database.NewMockDatabase(ctrl)
+
+			var dbErr error
+			if tt.dbErr {
+				dbErr = tt.wantErr
 			}
-			got, got1 := g.PostOrder(tt.args.ctx, tt.args.order)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("PostOrder() got = %v, want %v", got, tt.want)
+			g := NewGophermartService(ctx, cfg, mockDB)
+
+			userActual := models.User{Name: tt.args.username, Password: tt.args.password}
+			userExpected := models.User{Name: tt.args.username, Password: tt.args.password}
+			if !tt.args.isPassEqual {
+				userExpected.Password = userActual.Password + "random_string"
 			}
-			if got1 != tt.want1 {
-				t.Errorf("PostOrder() got1 = %v, want %v", got1, tt.want1)
+			userExpected.Password = g.HashGenerate(userExpected.Password)
+
+			mockDB.EXPECT().PostOrder(ctx, userActual.Name).Return(userExpected, dbErr).Times(1)
+
+			got, err := g.LoginUser(ctx, userActual)
+			if tt.wantErr != nil {
+				assert.Equal(t, tt.wantErr, err)
+				return
 			}
+			assert.NotEmpty(t, got)
 		})
 	}
 }
 
 func TestGophermartService_RegisterUser(t *testing.T) {
-	type fields struct {
-		db           datasources.Database
-		key          []byte
-		client       client.Client
-		mu           sync.Mutex
-		pollInterval time.Duration
-		workersNum   int
-		jobResults   map[string]*job
-	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	type args struct {
-		ctx  context.Context
 		user models.User
 	}
 	tests := []struct {
 		name    string
-		fields  fields
 		args    args
-		want    string
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name:    "valid input",
+			args:    args{user: models.User{Name: "username"}},
+			wantErr: false,
+		},
+		{
+			name:    "database error",
+			args:    args{user: models.User{Name: "username"}},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := &GophermartService{
-				db:           tt.fields.db,
-				key:          tt.fields.key,
-				client:       tt.fields.client,
-				mu:           tt.fields.mu,
-				pollInterval: tt.fields.pollInterval,
-				workersNum:   tt.fields.workersNum,
-				jobResults:   tt.fields.jobResults,
-			}
-			got, err := g.RegisterUser(tt.args.ctx, tt.args.user)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("RegisterUser() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("RegisterUser() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+			ctx := t.Context()
+			cfg := &config.Config{Key: "testingkey"}
+			mockDB := mock_database.NewMockDatabase(ctrl)
 
-func TestGophermartService_VerifyJWT(t *testing.T) {
-	type fields struct {
-		db           datasources.Database
-		key          []byte
-		client       client.Client
-		mu           sync.Mutex
-		pollInterval time.Duration
-		workersNum   int
-		jobResults   map[string]*job
-	}
-	type args struct {
-		token string
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    jwt.Claims
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			g := &GophermartService{
-				db:           tt.fields.db,
-				key:          tt.fields.key,
-				client:       tt.fields.client,
-				mu:           tt.fields.mu,
-				pollInterval: tt.fields.pollInterval,
-				workersNum:   tt.fields.workersNum,
-				jobResults:   tt.fields.jobResults,
+			var err error
+			if tt.wantErr {
+				err = errors.New("db error")
 			}
-			got, err := g.VerifyJWT(tt.args.token)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("VerifyJWT() error = %v, wantErr %v", err, tt.wantErr)
+			mockDB.EXPECT().InsertUser(ctx, gomock.Any()).Return(err).Times(1)
+
+			g := NewGophermartService(ctx, cfg, mockDB)
+
+			got, err := g.RegisterUser(ctx, tt.args.user)
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("VerifyJWT() got = %v, want %v", got, tt.want)
-			}
+			assert.NotEmpty(t, got)
 		})
 	}
 }
