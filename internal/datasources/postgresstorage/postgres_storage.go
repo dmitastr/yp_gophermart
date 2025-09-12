@@ -2,6 +2,7 @@ package postgresstorage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -169,6 +170,35 @@ func (p *PostgresStorage) PostOrder(ctx context.Context, order *models.Order) (*
 		err = errors.Join(err, tx.Commit(ctx))
 	}()
 	return order, nil
+
+}
+
+func (p *PostgresStorage) GetBalance(ctx context.Context, username string) (*models.Balance, error) {
+	tx, err := p.pool.Begin(ctx)
+	defer func() {
+		_ = tx.Commit(ctx)
+	}()
+
+	if err != nil {
+		return nil, err
+	}
+
+	query := `SELECT username, current, withdrawn
+				FROM balance
+                WHERE username = $1`
+
+	var balance models.Balance
+	var withdrawn sql.NullFloat64
+	err = tx.QueryRow(ctx, query, username).Scan(&balance.Username, &balance.Current, &withdrawn)
+	if err != nil {
+		return nil, err
+	}
+
+	if withdrawn.Valid {
+		balance.Withdrawn = withdrawn.Float64
+	}
+
+	return &balance, nil
 
 }
 

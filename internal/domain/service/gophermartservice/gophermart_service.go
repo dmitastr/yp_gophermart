@@ -94,6 +94,15 @@ func (g *GophermartService) GetOrders(ctx context.Context, username string) ([]m
 	return orders, err
 }
 
+func (g *GophermartService) GetBalance(ctx context.Context, username string) (balance *models.Balance, err error) {
+	balance, err = g.db.GetBalance(ctx, username)
+	if err != nil {
+		logger.Errorf("failed to get balance for username=%s, error=%v\n", username, err)
+	}
+
+	return
+}
+
 func (g *GophermartService) IssueJWT(user models.User) (string, error) {
 	claims := jwt.RegisteredClaims{
 		Subject:   user.Name,
