@@ -25,6 +25,12 @@ func (r Register) Handle(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	if !user.IsValid() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errors.New("login and password should not be empty").Error()})
+		return
+	}
+
 	token, err := r.service.RegisterUser(c, user)
 	if errors.Is(err, serviceErrors.ErrUserExists) {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
