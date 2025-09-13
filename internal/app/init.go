@@ -33,7 +33,7 @@ func Init(ctx context.Context, cfg *config.Config) *http.Server {
 
 	balance := users.Group("/balance", authCheck.Handle)
 	balance.GET("/", handlers.NewGetBalance(service).Handle)
-	// balance.GET("/withdraw", handlers.NewGetBalance(service).Handle)
+	balance.POST("/withdraw", handlers.NewBalanceWithdraw(service).Handle)
 
 	orders := users.Group("/orders", authCheck.Handle)
 	orders.GET("/", handlers.NewGetOrders(service).Handle)

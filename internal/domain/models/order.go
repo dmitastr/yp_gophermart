@@ -1,11 +1,9 @@
 package models
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/theplant/luhn"
 )
 
 var (
@@ -17,7 +15,7 @@ var (
 )
 
 type Order struct {
-	OrderID        string    `json:"number" db:"order_id"`
+	OrderID        OrderID   `json:"number" db:"order_id"`
 	AccrualOrderID string    `json:"order,omitempty" db:"-"`
 	Status         string    `json:"status" db:"status"`
 	Accrual        float64   `json:"accrual" db:"accrual"`
@@ -26,7 +24,7 @@ type Order struct {
 }
 
 func NewOrder(orderID string, username string) *Order {
-	return &Order{OrderID: orderID, UploadedAt: time.Now(), Username: username, Status: StatusNew}
+	return &Order{OrderID: OrderID(orderID), UploadedAt: time.Now(), Username: username, Status: StatusNew}
 }
 
 func (order *Order) ToNamedArgs() pgx.NamedArgs {
@@ -40,19 +38,15 @@ func (order *Order) IsFinal() bool {
 }
 
 func (order *Order) IsValid() bool {
-	orderIDInt, err := strconv.Atoi(order.OrderID)
-	if err != nil {
-		return false
-	}
-	return luhn.Valid(orderIDInt)
+	return order.OrderID.IsValid()
 }
 
 func (order *Order) SetOrderID(orderID string) {
 	accrualNumber := order.AccrualOrderID
 	order.AccrualOrderID = ""
 	if accrualNumber != "" {
-		order.OrderID = accrualNumber
+		order.OrderID = OrderID(accrualNumber)
 		return
 	}
-	order.OrderID = orderID
+	order.OrderID = OrderID(orderID)
 }

@@ -125,7 +125,7 @@ func (p *PostgresStorage) GetOrders(ctx context.Context, username string) ([]mod
 	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Order])
 }
 
-func (p *PostgresStorage) GetOrder(ctx context.Context, orderID string) (*models.Order, error) {
+func (p *PostgresStorage) GetOrder(ctx context.Context, orderID models.OrderID) (*models.Order, error) {
 	tx, err := p.pool.Begin(ctx)
 	defer func() {
 		_ = tx.Commit(ctx)
@@ -189,7 +189,8 @@ func (p *PostgresStorage) GetBalance(ctx context.Context, username string) (*mod
 
 	var balance models.Balance
 	var withdrawn sql.NullFloat64
-	err = tx.QueryRow(ctx, query, username).Scan(&balance.Username, &balance.Current, &withdrawn)
+	var current sql.NullFloat64
+	err = tx.QueryRow(ctx, query, username).Scan(&balance.Username, &current, &withdrawn)
 	if err != nil {
 		return nil, err
 	}
@@ -197,8 +198,32 @@ func (p *PostgresStorage) GetBalance(ctx context.Context, username string) (*mod
 	if withdrawn.Valid {
 		balance.Withdrawn = withdrawn.Float64
 	}
+	if current.Valid {
+		balance.Current = current.Float64
+	}
 
 	return &balance, nil
+
+}
+
+func (p *PostgresStorage) PostWithdraw(ctx context.Context, withdraw *models.Withdraw) error {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	query := `INSERT INTO withdrawals (username, order_id, sum, processed_at) 
+	VALUES (@username, @order_id, @sum, @processed_at) 
+	ON CONFLICT (order_id, username)  DO NOTHING`
+
+	if _, err := tx.Exec(ctx, query, withdraw.ToNamedArgs()); err != nil {
+		err = errors.Join(err, tx.Rollback(ctx))
+		return err
+	}
+	defer func() {
+		err = errors.Join(err, tx.Commit(ctx))
+	}()
+	return nil
 
 }
 

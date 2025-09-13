@@ -25,8 +25,8 @@ func NewAccrualClient(baseURL string) *AccrualClient {
 	return &AccrualClient{baseURL: baseURL, client: &http.Client{Timeout: 10 * time.Second}}
 }
 
-func (a *AccrualClient) GetOrder(ctx context.Context, orderID string) (order *models.Order, statusCode int, err error) {
-	callURL, _ := url.JoinPath(a.baseURL, "api/orders", orderID)
+func (a *AccrualClient) GetOrder(ctx context.Context, orderID models.OrderID) (order *models.Order, statusCode int, err error) {
+	callURL, _ := url.JoinPath(a.baseURL, "api/orders", string(orderID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, callURL, nil)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error creating request: %w", err)
@@ -52,7 +52,7 @@ func (a *AccrualClient) GetOrder(ctx context.Context, orderID string) (order *mo
 		err = errors.Join(err, resp.Body.Close())
 	}()
 
-	order.SetOrderID(orderID)
+	order.SetOrderID(string(orderID))
 	statusCode = resp.StatusCode
 
 	return order, resp.StatusCode, nil
