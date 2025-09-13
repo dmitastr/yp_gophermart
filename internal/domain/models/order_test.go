@@ -27,7 +27,7 @@ func TestOrder_IsFinal(t *testing.T) {
 func TestOrder_IsValid(t *testing.T) {
 	tests := []struct {
 		name    string
-		orderID string
+		orderID OrderID
 		want    bool
 	}{
 		{name: "valid number", orderID: "6799837", want: true},
@@ -45,7 +45,7 @@ func TestOrder_IsValid(t *testing.T) {
 
 func TestOrder_SetOrderID(t *testing.T) {
 	type fields struct {
-		OrderID        string
+		OrderID        OrderID
 		AccrualOrderID string
 	}
 	type args struct {

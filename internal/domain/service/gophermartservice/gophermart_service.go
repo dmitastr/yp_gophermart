@@ -118,6 +118,10 @@ func (g *GophermartService) PostWithdraw(ctx context.Context, withdraw *models.W
 	return serviceErrors.ErrInsufficientFunds
 }
 
+func (g *GophermartService) GetWithdrawals(ctx context.Context, username string) (withdraws []models.Withdraw, err error) {
+	return g.db.GetWithdrawals(ctx, username)
+}
+
 func (g *GophermartService) IssueJWT(user models.User) (string, error) {
 	claims := jwt.RegisteredClaims{
 		Subject:   user.Name,
