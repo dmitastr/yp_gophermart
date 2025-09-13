@@ -7,5 +7,5 @@ type Balance struct {
 }
 
 func (b *Balance) CanWithdraw(sum float64) bool {
-	return b.Current >= b.Withdrawn+sum
+	return b.Current >= sum
 }

@@ -30,6 +30,7 @@ func Init(ctx context.Context, cfg *config.Config) *http.Server {
 	users := api.Group("/user")
 	users.POST("/register", handlers.NewRegister(service).Handle)
 	users.POST("/login", handlers.NewLogin(service).Handle)
+	users.GET("/withdrawals", authCheck.Handle, handlers.NewGetWithdrawals(service).Handle)
 
 	balance := users.Group("/balance", authCheck.Handle)
 	balance.GET("/", handlers.NewGetBalance(service).Handle)
