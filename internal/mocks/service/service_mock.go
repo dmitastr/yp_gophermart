@@ -37,6 +37,21 @@ func (m *MockService) EXPECT() *MockServiceMockRecorder {
 	return m.recorder
 }
 
+// GetBalance mocks base method.
+func (m *MockService) GetBalance(arg0 context.Context, arg1 string) (*models.Balance, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBalance", arg0, arg1)
+	ret0, _ := ret[0].(*models.Balance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBalance indicates an expected call of GetBalance.
+func (mr *MockServiceMockRecorder) GetBalance(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockService)(nil).GetBalance), arg0, arg1)
+}
+
 // GetOrders mocks base method.
 func (m *MockService) GetOrders(arg0 context.Context, arg1 string) ([]models.Order, error) {
 	m.ctrl.T.Helper()
@@ -95,6 +110,20 @@ func (m *MockService) PostOrder(arg0 context.Context, arg1 *models.Order) (*goph
 func (mr *MockServiceMockRecorder) PostOrder(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostOrder", reflect.TypeOf((*MockService)(nil).PostOrder), arg0, arg1)
+}
+
+// PostWithdraw mocks base method.
+func (m *MockService) PostWithdraw(arg0 context.Context, arg1 *models.Withdraw) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PostWithdraw", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PostWithdraw indicates an expected call of PostWithdraw.
+func (mr *MockServiceMockRecorder) PostWithdraw(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostWithdraw", reflect.TypeOf((*MockService)(nil).PostWithdraw), arg0, arg1)
 }
 
 // RegisterUser mocks base method.

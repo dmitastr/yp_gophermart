@@ -5,3 +5,7 @@ type Balance struct {
 	Current   float64 `json:"current"`
 	Withdrawn float64 `json:"withdrawn"`
 }
+
+func (b *Balance) CanWithdraw(sum float64) bool {
+	return b.Current >= b.Withdrawn+sum
+}

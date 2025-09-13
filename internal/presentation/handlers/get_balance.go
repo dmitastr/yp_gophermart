@@ -15,7 +15,7 @@ func NewGetBalance(service service.Service) *GetBalance {
 	return &GetBalance{service: service}
 }
 
-func (h *GetBalance) Handle(c *gin.Context) {
+func (h GetBalance) Handle(c *gin.Context) {
 	username, exists := c.Get("username")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})

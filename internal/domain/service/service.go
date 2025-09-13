@@ -16,4 +16,5 @@ type Service interface {
 	GetOrders(context.Context, string) ([]models.Order, error)
 	PostOrder(context.Context, *models.Order) (*gophermartservice.WorkerResult, bool)
 	GetBalance(context.Context, string) (*models.Balance, error)
+	PostWithdraw(context.Context, *models.Withdraw) error
 }
