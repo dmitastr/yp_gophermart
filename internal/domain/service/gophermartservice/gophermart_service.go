@@ -39,7 +39,7 @@ type GophermartService struct {
 	mu           sync.Mutex
 	pollInterval time.Duration
 	workersNum   int
-	jobResults   map[string]*job
+	jobResults   map[models.OrderID]*job
 }
 
 func NewGophermartService(ctx context.Context, cfg *config.Config, db datasources.Database) *GophermartService {
@@ -48,7 +48,7 @@ func NewGophermartService(ctx context.Context, cfg *config.Config, db datasource
 		pollInterval: time.Second * 1,
 		workersNum:   3,
 		client:       accrualclient.NewAccrualClient(cfg.AccrualAddress),
-		jobResults:   make(map[string]*job),
+		jobResults:   make(map[models.OrderID]*job),
 	}
 	g.GenerateSecretKey(cfg.Key)
 	// g.start(ctx)
@@ -92,6 +92,34 @@ func (g *GophermartService) GetOrders(ctx context.Context, username string) ([]m
 	}
 
 	return orders, err
+}
+
+func (g *GophermartService) GetBalance(ctx context.Context, username string) (balance *models.Balance, err error) {
+	balance, err = g.db.GetBalance(ctx, username)
+	if err != nil {
+		logger.Errorf("failed to get balance for username=%s, error=%v\n", username, err)
+	}
+
+	return
+}
+
+func (g *GophermartService) PostWithdraw(ctx context.Context, withdraw *models.Withdraw) error {
+	balance, err := g.GetBalance(ctx, withdraw.Username)
+	if err != nil {
+		return err
+	}
+	if withdraw.ProcessedAt.IsZero() {
+		withdraw.ProcessedAt = time.Now()
+	}
+
+	if balance.CanWithdraw(withdraw.Sum) {
+		return g.db.PostWithdraw(ctx, withdraw)
+	}
+	return serviceErrors.ErrInsufficientFunds
+}
+
+func (g *GophermartService) GetWithdrawals(ctx context.Context, username string) (withdraws []models.Withdraw, err error) {
+	return g.db.GetWithdrawals(ctx, username)
 }
 
 func (g *GophermartService) IssueJWT(user models.User) (string, error) {
@@ -150,7 +178,7 @@ func (g *GophermartService) startPolling(ctx context.Context) {
 			return
 		case <-ticker.C:
 			jobs := g.jobResults
-			g.jobResults = make(map[string]*job)
+			g.jobResults = make(map[models.OrderID]*job)
 
 			for _, j := range jobs {
 				result := g.updateOrder(ctx, j.order)

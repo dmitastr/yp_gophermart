@@ -2,6 +2,7 @@ package postgresstorage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -124,7 +125,7 @@ func (p *PostgresStorage) GetOrders(ctx context.Context, username string) ([]mod
 	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Order])
 }
 
-func (p *PostgresStorage) GetOrder(ctx context.Context, orderID string) (*models.Order, error) {
+func (p *PostgresStorage) GetOrder(ctx context.Context, orderID models.OrderID) (*models.Order, error) {
 	tx, err := p.pool.Begin(ctx)
 	defer func() {
 		_ = tx.Commit(ctx)
@@ -170,6 +171,84 @@ func (p *PostgresStorage) PostOrder(ctx context.Context, order *models.Order) (*
 	}()
 	return order, nil
 
+}
+
+func (p *PostgresStorage) GetBalance(ctx context.Context, username string) (*models.Balance, error) {
+	tx, err := p.pool.Begin(ctx)
+	defer func() {
+		_ = tx.Commit(ctx)
+	}()
+
+	if err != nil {
+		return nil, err
+	}
+
+	query := `SELECT username, current, withdrawn
+				FROM balance
+                WHERE username = $1`
+
+	var balance models.Balance
+	var withdrawn sql.NullFloat64
+	var current sql.NullFloat64
+	err = tx.QueryRow(ctx, query, username).Scan(&balance.Username, &current, &withdrawn)
+	if err != nil {
+		return nil, err
+	}
+
+	if withdrawn.Valid {
+		balance.Withdrawn = withdrawn.Float64
+	}
+	if current.Valid {
+		balance.Current = current.Float64
+	}
+
+	return &balance, nil
+
+}
+
+func (p *PostgresStorage) PostWithdraw(ctx context.Context, withdraw *models.Withdraw) error {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	query := `INSERT INTO withdrawals (username, order_id, sum, processed_at) 
+	VALUES (@username, @order_id, @sum, @processed_at) 
+	ON CONFLICT (order_id, username)  DO NOTHING`
+
+	if _, err := tx.Exec(ctx, query, withdraw.ToNamedArgs()); err != nil {
+		err = errors.Join(err, tx.Rollback(ctx))
+		return err
+	}
+	defer func() {
+		err = errors.Join(err, tx.Commit(ctx))
+	}()
+
+	return nil
+}
+
+func (p *PostgresStorage) GetWithdrawals(ctx context.Context, username string) ([]models.Withdraw, error) {
+	tx, err := p.pool.Begin(ctx)
+	defer func() {
+		_ = tx.Commit(ctx)
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	query := `SELECT order_id, sum, processed_at, username
+				FROM withdrawals 
+                WHERE username = $1 
+                ORDER BY processed_at DESC`
+
+	rows, err := tx.Query(ctx, query, username)
+	if err != nil {
+		logger.Errorf("error getting witdrawals: %v\n", err)
+		err = errors.Join(err, tx.Rollback(ctx))
+		return nil, err
+	}
+
+	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Withdraw])
 }
 
 func (p *PostgresStorage) toNamedArgs(user models.User) pgx.NamedArgs {

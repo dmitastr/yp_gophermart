@@ -26,7 +26,7 @@ func TestPostOrder_Handle(t *testing.T) {
 	mockService := mock_service.NewMockService(ctrl)
 
 	type args struct {
-		orderID    string
+		orderID    models.OrderID
 		orderExist bool
 		err        error
 		authorized bool

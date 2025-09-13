@@ -35,8 +35,23 @@ func (m *MockDatabase) EXPECT() *MockDatabaseMockRecorder {
 	return m.recorder
 }
 
+// GetBalance mocks base method.
+func (m *MockDatabase) GetBalance(arg0 context.Context, arg1 string) (*models.Balance, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBalance", arg0, arg1)
+	ret0, _ := ret[0].(*models.Balance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBalance indicates an expected call of GetBalance.
+func (mr *MockDatabaseMockRecorder) GetBalance(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockDatabase)(nil).GetBalance), arg0, arg1)
+}
+
 // GetOrder mocks base method.
-func (m *MockDatabase) GetOrder(ctx context.Context, orderID string) (*models.Order, error) {
+func (m *MockDatabase) GetOrder(ctx context.Context, orderID models.OrderID) (*models.Order, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOrder", ctx, orderID)
 	ret0, _ := ret[0].(*models.Order)
@@ -80,6 +95,21 @@ func (mr *MockDatabaseMockRecorder) GetUser(arg0, arg1 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockDatabase)(nil).GetUser), arg0, arg1)
 }
 
+// GetWithdrawals mocks base method.
+func (m *MockDatabase) GetWithdrawals(arg0 context.Context, arg1 string) ([]models.Withdraw, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetWithdrawals", arg0, arg1)
+	ret0, _ := ret[0].([]models.Withdraw)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetWithdrawals indicates an expected call of GetWithdrawals.
+func (mr *MockDatabaseMockRecorder) GetWithdrawals(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWithdrawals", reflect.TypeOf((*MockDatabase)(nil).GetWithdrawals), arg0, arg1)
+}
+
 // InsertUser mocks base method.
 func (m *MockDatabase) InsertUser(arg0 context.Context, arg1 models.User) error {
 	m.ctrl.T.Helper()
@@ -107,6 +137,20 @@ func (m *MockDatabase) PostOrder(arg0 context.Context, arg1 *models.Order) (*mod
 func (mr *MockDatabaseMockRecorder) PostOrder(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostOrder", reflect.TypeOf((*MockDatabase)(nil).PostOrder), arg0, arg1)
+}
+
+// PostWithdraw mocks base method.
+func (m *MockDatabase) PostWithdraw(arg0 context.Context, arg1 *models.Withdraw) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PostWithdraw", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PostWithdraw indicates an expected call of PostWithdraw.
+func (mr *MockDatabaseMockRecorder) PostWithdraw(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostWithdraw", reflect.TypeOf((*MockDatabase)(nil).PostWithdraw), arg0, arg1)
 }
 
 // UpdateUser mocks base method.
