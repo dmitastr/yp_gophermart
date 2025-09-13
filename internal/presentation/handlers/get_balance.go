@@ -16,18 +16,8 @@ func NewGetBalance(service service.Service) *GetBalance {
 }
 
 func (h GetBalance) Handle(c *gin.Context) {
-	username, exists := c.Get("username")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})
-		return
-	}
-
-	usernameString, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})
-	}
-
-	balance, err := h.service.GetBalance(c, usernameString)
+	username := c.MustGet("username").(string)
+	balance, err := h.service.GetBalance(c, username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

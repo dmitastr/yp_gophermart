@@ -15,4 +15,5 @@ type Database interface {
 	PostOrder(context.Context, *models.Order) (*models.Order, error)
 	GetBalance(context.Context, string) (*models.Balance, error)
 	PostWithdraw(context.Context, *models.Withdraw) error
+	GetWithdrawals(context.Context, string) ([]models.Withdraw, error)
 }

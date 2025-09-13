@@ -223,8 +223,32 @@ func (p *PostgresStorage) PostWithdraw(ctx context.Context, withdraw *models.Wit
 	defer func() {
 		err = errors.Join(err, tx.Commit(ctx))
 	}()
-	return nil
 
+	return nil
+}
+
+func (p *PostgresStorage) GetWithdrawals(ctx context.Context, username string) ([]models.Withdraw, error) {
+	tx, err := p.pool.Begin(ctx)
+	defer func() {
+		_ = tx.Commit(ctx)
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	query := `SELECT order_id, sum, processed_at, username
+				FROM withdrawals 
+                WHERE username = $1 
+                ORDER BY processed_at DESC`
+
+	rows, err := tx.Query(ctx, query, username)
+	if err != nil {
+		logger.Errorf("error getting witdrawals: %v\n", err)
+		err = errors.Join(err, tx.Rollback(ctx))
+		return nil, err
+	}
+
+	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Withdraw])
 }
 
 func (p *PostgresStorage) toNamedArgs(user models.User) pgx.NamedArgs {
