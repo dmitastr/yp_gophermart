@@ -56,7 +56,7 @@ func TestOrder_SetOrderID(t *testing.T) {
 		name        string
 		fields      fields
 		args        args
-		wantOrderID string
+		wantOrderID OrderID
 	}{
 		{name: "only order id is present", fields: fields{OrderID: "6799837"}, args: args{orderID: "6799837"}, wantOrderID: "6799837"},
 		{name: "only accrual order id is present", fields: fields{AccrualOrderID: "6799837"}, args: args{orderID: "6799837"}, wantOrderID: "6799837"},
