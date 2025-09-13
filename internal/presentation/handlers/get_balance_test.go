@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
-	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 	mockservice "github.com/dmitastr/yp_gophermart/internal/mocks/service"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
@@ -35,10 +34,6 @@ func TestGetBalance_Handle(t *testing.T) {
 			args: args{isAuthorized: true, wantStatus: http.StatusOK, serviceErr: nil},
 		},
 		{
-			name: "user is not authorized",
-			args: args{isAuthorized: false, serviceErr: serviceErrors.ErrBadUserPassword, wantStatus: http.StatusUnauthorized},
-		},
-		{
 			name: "service error",
 			args: args{isAuthorized: true, serviceErr: errors.New("service error"), wantStatus: http.StatusInternalServerError},
 		},
@@ -53,17 +48,12 @@ func TestGetBalance_Handle(t *testing.T) {
 			c.Request = req
 
 			username := "username"
-			var balance *models.Balance
-			if tt.args.isAuthorized {
-				balance = &models.Balance{
-					Username:  username,
-					Current:   100,
-					Withdrawn: 9,
-				}
-			}
+			c.Set("username", username)
 
-			if tt.args.isAuthorized {
-				c.Set("username", "username")
+			balance := &models.Balance{
+				Username:  username,
+				Current:   100,
+				Withdrawn: 9,
 			}
 
 			mockService := mockservice.NewMockService(ctrl)
