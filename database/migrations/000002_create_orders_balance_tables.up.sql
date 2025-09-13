@@ -47,7 +47,7 @@ ALTER TABLE IF EXISTS withdrawals
 CREATE OR REPLACE VIEW balance
 AS
 SELECT d.username,
-       d.debit AS current,
+       COALESCE(d.debit, 0) - COALESCE(c.credit, 0) AS current,
        c.credit AS withdrawn
 FROM ( SELECT orders.username,
               sum(orders.accrual) AS debit
