@@ -1,6 +1,7 @@
 package app
 
 import (
+	"net"
 	"net/http"
 	"time"
 
@@ -46,6 +47,9 @@ func Init(ctx context.Context, cfg *config.Config) *http.Server {
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       5 * time.Second,
 		Handler:           router,
+		BaseContext: func(listener net.Listener) context.Context {
+			return ctx
+		},
 	}
 	return server
 }

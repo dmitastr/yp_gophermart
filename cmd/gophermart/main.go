@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"context"
 
@@ -39,7 +40,9 @@ func main() {
 	})
 	g.Go(func() error {
 		<-gCtx.Done()
-		return server.Shutdown(context.Background())
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return server.Shutdown(shutdownCtx)
 	})
 
 	if err := g.Wait(); err != nil {
