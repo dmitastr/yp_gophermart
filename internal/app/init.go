@@ -4,13 +4,14 @@ import (
 	"net/http"
 	"time"
 
+	"context"
+
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/datasources/postgresstorage"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/gophermartservice"
 	"github.com/dmitastr/yp_gophermart/internal/presentation/handlers"
 	"github.com/dmitastr/yp_gophermart/internal/presentation/middleware"
 	"github.com/gin-gonic/gin"
-	"golang.org/x/net/context"
 )
 
 func Init(ctx context.Context, cfg *config.Config) *http.Server {

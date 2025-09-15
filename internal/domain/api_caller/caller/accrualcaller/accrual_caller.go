@@ -4,11 +4,12 @@ import (
 	"errors"
 	"sync"
 
+	"context"
+
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/client"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/client/accrualclient"
-	"golang.org/x/net/context"
 )
 
 type (

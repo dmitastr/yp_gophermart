@@ -6,10 +6,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"context"
+
 	"github.com/dmitastr/yp_gophermart/internal/app"
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/logger"
-	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
 )
 
