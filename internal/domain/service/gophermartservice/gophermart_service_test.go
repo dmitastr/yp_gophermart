@@ -112,7 +112,10 @@ func TestGophermartService_LoginUser(t *testing.T) {
 			if !tt.args.isPassEqual {
 				userExpected.Password = userActual.Password + "random_string"
 			}
-			userExpected.Password = g.HashGenerate(userExpected.Password)
+
+			err := userExpected.HashPassword()
+			assert.NoError(t, err)
+			userExpected.Password = userExpected.Hash
 
 			mockDB.EXPECT().GetUser(ctx, userActual.Name).Return(userExpected, dbErr).Times(1)
 
@@ -169,6 +172,114 @@ func TestGophermartService_RegisterUser(t *testing.T) {
 				return
 			}
 			assert.NotEmpty(t, got)
+		})
+	}
+}
+
+func TestGophermartService_PostWithdraw(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	type args struct {
+		withdraw       *models.Withdraw
+		currentBalance float64
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr error
+		dbErr   error
+	}{
+		{
+			name:    "valid input",
+			args:    args{withdraw: &models.Withdraw{OrderID: "5957394", Sum: 10, Username: "username"}, currentBalance: 10},
+			wantErr: nil,
+			dbErr:   nil,
+		},
+		{
+			name:    "insufficient funds",
+			args:    args{withdraw: &models.Withdraw{OrderID: "5957394", Sum: 10, Username: "username"}, currentBalance: 1},
+			wantErr: serviceErrors.ErrInsufficientFunds,
+			dbErr:   nil,
+		},
+		{
+			name:    "database error",
+			args:    args{withdraw: &models.Withdraw{OrderID: "5957394", Sum: 10, Username: "username"}, currentBalance: 10},
+			wantErr: nil,
+			dbErr:   errors.New("db error"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			username := tt.args.withdraw.Username
+
+			ctx := t.Context()
+			cfg := &config.Config{Key: "testingkey"}
+
+			mockDB := mock_database.NewMockDatabase(ctrl)
+			mockDB.EXPECT().GetBalance(ctx, username).Return(&models.Balance{Username: username, Current: tt.args.currentBalance}, nil).Times(1)
+			mockDB.EXPECT().PostWithdraw(ctx, tt.args.withdraw).Return(tt.dbErr).AnyTimes()
+
+			g := NewGophermartService(ctx, cfg, mockDB)
+
+			wantErr := tt.wantErr
+			if tt.dbErr != nil {
+				wantErr = tt.dbErr
+			}
+
+			err := g.PostWithdraw(ctx, tt.args.withdraw)
+			if wantErr != nil {
+				assert.Equal(t, wantErr, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestGophermartService_GetBalance(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	type args struct {
+		username string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		dbErr   error
+		balance *models.Balance
+	}{
+		{
+			name:  "valid input",
+			args:  args{username: "username"},
+			dbErr: nil,
+		},
+		{
+			name:  "database error",
+			args:  args{username: "username"},
+			dbErr: errors.New("db error"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			ctx := t.Context()
+			cfg := &config.Config{Key: "testingkey"}
+
+			mockDB := mock_database.NewMockDatabase(ctrl)
+			balance := &models.Balance{Username: tt.args.username, Current: 1}
+			mockDB.EXPECT().GetBalance(ctx, tt.args.username).Return(balance, tt.dbErr).Times(1)
+
+			g := NewGophermartService(ctx, cfg, mockDB)
+
+			balanceGot, err := g.GetBalance(ctx, tt.args.username)
+			if tt.dbErr != nil {
+				assert.Equal(t, tt.dbErr, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, balance, balanceGot)
 		})
 	}
 }

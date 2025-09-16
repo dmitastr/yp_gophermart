@@ -48,19 +48,34 @@ func NewPostgresStorage(ctx context.Context, cfg *config.Config) (*PostgresStora
 	return &PostgresStorage{pool: pool}, nil
 }
 
+func (p *PostgresStorage) execute(ctx context.Context, tx pgx.Tx, query string, args pgx.NamedArgs) (err error) {
+	if _, err := tx.Exec(ctx, query, args); err != nil {
+		return fmt.Errorf("error inserting order: %v", err)
+	}
+
+	defer func() {
+		if rErr := tx.Rollback(ctx); rErr != nil && !errors.Is(rErr, pgx.ErrTxClosed) {
+			err = errors.Join(err, rErr)
+			logger.Errorf("Error rolling back transaction: %v", rErr)
+		}
+	}()
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+
+}
+
 func (p *PostgresStorage) InsertUser(ctx context.Context, user models.User) (err error) {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = errors.Join(err, tx.Commit(ctx))
-	}()
 
 	query := `INSERT INTO users (username, password, created_at) VALUES (@name, @pass, @created_at)`
 	args := user.ToNamedArgs()
-	if _, err := tx.Exec(ctx, query, args); err != nil {
-		err = errors.Join(err, tx.Rollback(ctx))
+	if err := p.execute(ctx, tx, query, args); err != nil {
 		return err
 	}
 
@@ -79,16 +94,11 @@ func (p *PostgresStorage) UpdateUser(ctx context.Context, user models.User) erro
 		return err
 	}
 
-	args := user.ToNamedArgs()
-	if _, err := tx.Exec(ctx, `UPDATE users SET password=@pass WHERE username = @name`, args); err != nil {
-		err = errors.Join(err, tx.Rollback(ctx))
+	if err := p.execute(ctx, tx, `UPDATE users SET password=@pass WHERE username = @name`, user.ToNamedArgs()); err != nil {
 		return err
 	}
-	defer func() {
-		err = errors.Join(err, tx.Commit(ctx))
-	}()
 
-	return err
+	return nil
 }
 
 func (p *PostgresStorage) GetOrders(ctx context.Context, username string) ([]models.Order, error) {
@@ -113,7 +123,7 @@ func (p *PostgresStorage) GetOrder(ctx context.Context, orderID models.OrderID) 
 	var order models.Order
 	err := p.pool.QueryRow(ctx, query, orderID).Scan(&order.OrderID, &order.Status, &order.Accrual, &order.UploadedAt, &order.Username)
 	if err != nil {
-		return nil, fmt.Errorf("error getting order: %v\n", err)
+		return nil, fmt.Errorf("error getting order: %v", err)
 	}
 
 	return &order, nil
@@ -124,12 +134,6 @@ func (p *PostgresStorage) PostOrder(ctx context.Context, order *models.Order) (e
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if rErr := tx.Rollback(ctx); rErr != nil && !errors.Is(rErr, pgx.ErrTxClosed) {
-			err = errors.Join(err, rErr)
-			logger.Errorf("Error rolling back transaction: %v", rErr)
-		}
-	}()
 
 	query := `INSERT INTO orders (order_id, status, accrual, uploaded_at, username) 
 	VALUES (@order_id, @status, @accrual, @uploaded_at, @username) 
@@ -137,11 +141,8 @@ func (p *PostgresStorage) PostOrder(ctx context.Context, order *models.Order) (e
 	status = @status, 
     accrual = @accrual`
 
-	if _, err := tx.Exec(ctx, query, order.ToNamedArgs()); err != nil {
-		return fmt.Errorf("error inserting order: %v", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	if err := p.execute(ctx, tx, query, order.ToNamedArgs()); err != nil {
+		return err
 	}
 	return nil
 
@@ -177,16 +178,12 @@ func (p *PostgresStorage) PostWithdraw(ctx context.Context, withdraw *models.Wit
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = errors.Join(err, tx.Commit(ctx))
-	}()
 
 	query := `INSERT INTO withdrawals (username, order_id, sum, processed_at) 
 	VALUES (@username, @order_id, @sum, @processed_at) 
 	ON CONFLICT (order_id, username)  DO NOTHING`
 
-	if _, err := tx.Exec(ctx, query, withdraw.ToNamedArgs()); err != nil {
-		err = errors.Join(err, tx.Rollback(ctx))
+	if err := p.execute(ctx, tx, query, withdraw.ToNamedArgs()); err != nil {
 		return err
 	}
 
