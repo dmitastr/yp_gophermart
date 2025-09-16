@@ -3,11 +3,11 @@ package jwtmanager
 import (
 	"crypto/rand"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
+	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -59,7 +59,7 @@ func (j *JWTManager) generateSecretKey(key string) {
 		j.key = make([]byte, 32)
 		_, err := rand.Read(j.key)
 		if err != nil {
-			log.Fatalf("Error generating random key: %v", err)
+			logger.Fatal(fmt.Sprintf("Error generating random key: %v", err))
 		}
 		return
 	}

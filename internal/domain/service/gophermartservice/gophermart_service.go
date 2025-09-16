@@ -1,9 +1,7 @@
 package gophermartservice
 
 import (
-	"crypto/rand"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -12,7 +10,7 @@ import (
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/datasources"
-	jwtmanager "github.com/dmitastr/yp_gophermart/internal/domain/jwt_manager"
+	"github.com/dmitastr/yp_gophermart/internal/domain/jwtmanager"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/client"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/client/accrualclient"
@@ -36,7 +34,6 @@ type job struct {
 type GophermartService struct {
 	db           datasources.Database
 	tokenManager jwtmanager.Manager
-	key          []byte
 	client       client.Client
 	mu           sync.Mutex
 	pollInterval time.Duration
@@ -53,8 +50,6 @@ func NewGophermartService(ctx context.Context, cfg *config.Config, db datasource
 		client:       accrualclient.NewAccrualClient(cfg.AccrualAddress),
 		jobResults:   make(map[models.OrderID]*job),
 	}
-	g.GenerateSecretKey(cfg.Key)
-	// g.start(ctx)
 	go g.startPolling(ctx)
 	return g
 }
@@ -129,37 +124,8 @@ func (g *GophermartService) GetWithdrawals(ctx context.Context, username string)
 	return g.db.GetWithdrawals(ctx, username)
 }
 
-func (g *GophermartService) IssueJWT(user models.User) (string, error) {
-	claims := jwt.RegisteredClaims{
-		Subject:   user.Name,
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		Issuer:    "gophermart",
-	}
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return tok.SignedString(g.key)
-}
-
 func (g *GophermartService) VerifyJWT(token string) (jwt.Claims, error) {
 	return g.tokenManager.VerifyJWT(token)
-}
-
-func (g *GophermartService) HashGenerate(password string) string {
-	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(hash)
-}
-
-func (g *GophermartService) GenerateSecretKey(key string) {
-	if key == "" {
-		g.key = make([]byte, 32)
-		_, err := rand.Read(g.key)
-		if err != nil {
-			log.Fatalf("Error generating random key: %v", err)
-		}
-		return
-	}
-
-	g.key = []byte(key)
 }
 
 func (g *GophermartService) startPolling(ctx context.Context) {
