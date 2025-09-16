@@ -5,11 +5,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"context"
 
 	"github.com/dmitastr/yp_gophermart/internal/app"
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/logger"
-	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -38,7 +40,9 @@ func main() {
 	})
 	g.Go(func() error {
 		<-gCtx.Done()
-		return server.Shutdown(context.Background())
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return server.Shutdown(shutdownCtx)
 	})
 
 	if err := g.Wait(); err != nil {

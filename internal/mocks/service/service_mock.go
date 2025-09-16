@@ -82,21 +82,6 @@ func (mr *MockServiceMockRecorder) GetWithdrawals(arg0, arg1 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWithdrawals", reflect.TypeOf((*MockService)(nil).GetWithdrawals), arg0, arg1)
 }
 
-// IssueJWT mocks base method.
-func (m *MockService) IssueJWT(arg0 models.User) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IssueJWT", arg0)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// IssueJWT indicates an expected call of IssueJWT.
-func (mr *MockServiceMockRecorder) IssueJWT(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IssueJWT", reflect.TypeOf((*MockService)(nil).IssueJWT), arg0)
-}
-
 // LoginUser mocks base method.
 func (m *MockService) LoginUser(arg0 context.Context, arg1 models.User) (string, error) {
 	m.ctrl.T.Helper()

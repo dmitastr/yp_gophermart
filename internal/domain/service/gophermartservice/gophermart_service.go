@@ -12,6 +12,7 @@ import (
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/datasources"
+	jwtmanager "github.com/dmitastr/yp_gophermart/internal/domain/jwt_manager"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/client"
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/client/accrualclient"
@@ -34,6 +35,7 @@ type job struct {
 
 type GophermartService struct {
 	db           datasources.Database
+	tokenManager jwtmanager.Manager
 	key          []byte
 	client       client.Client
 	mu           sync.Mutex
@@ -45,6 +47,7 @@ type GophermartService struct {
 func NewGophermartService(ctx context.Context, cfg *config.Config, db datasources.Database) *GophermartService {
 	g := &GophermartService{
 		db:           db,
+		tokenManager: jwtmanager.NewJWTManager(cfg),
 		pollInterval: time.Second * 1,
 		workersNum:   3,
 		client:       accrualclient.NewAccrualClient(cfg.AccrualAddress),
@@ -57,12 +60,16 @@ func NewGophermartService(ctx context.Context, cfg *config.Config, db datasource
 }
 
 func (g *GophermartService) RegisterUser(ctx context.Context, user models.User) (string, error) {
-	user.Hash = g.HashGenerate(user.Password)
+	err := user.HashPassword()
+	if err != nil {
+		return "", err
+	}
+
 	if err := g.db.InsertUser(ctx, user); err != nil {
 		return "", fmt.Errorf("failed to register user: %w", err)
 	}
 
-	token, err := g.IssueJWT(user)
+	token, err := g.tokenManager.IssueJWT(user)
 	if err != nil {
 		return "", err
 	}
@@ -80,7 +87,7 @@ func (g *GophermartService) LoginUser(ctx context.Context, user models.User) (to
 		return token, serviceErrors.ErrBadUserPassword
 	}
 
-	return g.IssueJWT(user)
+	return g.tokenManager.IssueJWT(user)
 }
 
 func (g *GophermartService) GetOrders(ctx context.Context, username string) ([]models.Order, error) {
@@ -134,20 +141,7 @@ func (g *GophermartService) IssueJWT(user models.User) (string, error) {
 }
 
 func (g *GophermartService) VerifyJWT(token string) (jwt.Claims, error) {
-	jwtToken, err := jwt.ParseWithClaims(token, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
-		if token.Method.Alg() != "HS256" {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Method.Alg())
-		}
-		return g.key, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	claims, ok := jwtToken.Claims.(*jwt.RegisteredClaims)
-	if !ok || !jwtToken.Valid {
-		return nil, fmt.Errorf("invalid token claims")
-	}
-	return claims, nil
+	return g.tokenManager.VerifyJWT(token)
 }
 
 func (g *GophermartService) HashGenerate(password string) string {
@@ -200,7 +194,9 @@ func (g *GophermartService) updateOrder(ctx context.Context, order *models.Order
 		order.Accrual = newOrder.Accrual
 	}
 
-	_, _ = g.db.PostOrder(ctx, order)
+	if err := g.db.PostOrder(ctx, order); err != nil {
+		return &WorkerResult{Order: order, Err: err}
+	}
 
 	if !order.IsFinal() {
 		_, _ = g.AddJob(ctx, order)

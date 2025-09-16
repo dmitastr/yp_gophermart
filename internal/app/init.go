@@ -1,8 +1,11 @@
 package app
 
 import (
+	"net"
 	"net/http"
 	"time"
+
+	"context"
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/datasources/postgresstorage"
@@ -10,7 +13,6 @@ import (
 	"github.com/dmitastr/yp_gophermart/internal/presentation/handlers"
 	"github.com/dmitastr/yp_gophermart/internal/presentation/middleware"
 	"github.com/gin-gonic/gin"
-	"golang.org/x/net/context"
 )
 
 func Init(ctx context.Context, cfg *config.Config) *http.Server {
@@ -45,6 +47,9 @@ func Init(ctx context.Context, cfg *config.Config) *http.Server {
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       5 * time.Second,
 		Handler:           router,
+		BaseContext: func(listener net.Listener) context.Context {
+			return ctx
+		},
 	}
 	return server
 }

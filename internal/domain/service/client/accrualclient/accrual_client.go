@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
-	"golang.org/x/net/context"
 )
 
 type AccrualClient struct {

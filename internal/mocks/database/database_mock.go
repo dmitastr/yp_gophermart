@@ -125,12 +125,11 @@ func (mr *MockDatabaseMockRecorder) InsertUser(arg0, arg1 interface{}) *gomock.C
 }
 
 // PostOrder mocks base method.
-func (m *MockDatabase) PostOrder(arg0 context.Context, arg1 *models.Order) (*models.Order, error) {
+func (m *MockDatabase) PostOrder(arg0 context.Context, arg1 *models.Order) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PostOrder", arg0, arg1)
-	ret0, _ := ret[0].(*models.Order)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // PostOrder indicates an expected call of PostOrder.
