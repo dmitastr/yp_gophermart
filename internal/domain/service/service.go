@@ -11,7 +11,6 @@ import (
 type Service interface {
 	RegisterUser(context.Context, models.User) (string, error)
 	LoginUser(context.Context, models.User) (string, error)
-	IssueJWT(models.User) (string, error)
 	VerifyJWT(string) (jwt.Claims, error)
 	GetOrders(context.Context, string) ([]models.Order, error)
 	PostOrder(context.Context, *models.Order) (*gophermartservice.WorkerResult, bool)
