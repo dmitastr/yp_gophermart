@@ -34,7 +34,6 @@ type job struct {
 type GophermartService struct {
 	db           datasources.Database
 	tokenManager jwtmanager.Manager
-	key          []byte
 	client       client.Client
 	mu           sync.Mutex
 	pollInterval time.Duration
