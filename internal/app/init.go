@@ -12,6 +12,7 @@ import (
 	"github.com/dmitastr/yp_gophermart/internal/domain/service/gophermartservice"
 	"github.com/dmitastr/yp_gophermart/internal/presentation/handlers"
 	"github.com/dmitastr/yp_gophermart/internal/presentation/middleware"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,20 +27,21 @@ func Init(ctx context.Context, cfg *config.Config) *http.Server {
 	service := gophermartservice.NewGophermartService(ctx, cfg, db)
 
 	authCheck := middleware.NewAuthorizeCheck(service)
+	gzipCompression := gzip.Gzip(gzip.DefaultCompression)
 
 	api := router.Group("/api")
 
 	users := api.Group("/user")
 	users.POST("/register", handlers.NewRegister(service).Handle)
 	users.POST("/login", handlers.NewLogin(service).Handle)
-	users.GET("/withdrawals", authCheck.Handle, handlers.NewGetWithdrawals(service).Handle)
+	users.GET("/withdrawals", authCheck.Handle, gzipCompression, handlers.NewGetWithdrawals(service).Handle)
 
 	balance := users.Group("/balance", authCheck.Handle)
 	balance.GET("/", handlers.NewGetBalance(service).Handle)
 	balance.POST("/withdraw", handlers.NewBalanceWithdraw(service).Handle)
 
 	orders := users.Group("/orders", authCheck.Handle)
-	orders.GET("/", handlers.NewGetOrders(service).Handle)
+	orders.GET("/", gzipCompression, handlers.NewGetOrders(service).Handle)
 	orders.POST("/", handlers.NewPostOrder(service).Handle)
 
 	server := &http.Server{
