@@ -1,0 +1,67 @@
+package handlers
+
+import (
+	"errors"
+	"io"
+	"net/http"
+	"strings"
+
+	"github.com/dmitastr/yp_gophermart/internal/domain/models"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service"
+	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
+	"github.com/dmitastr/yp_gophermart/internal/logger"
+	"github.com/gin-gonic/gin"
+)
+
+type PostOrder struct {
+	service service.Service
+}
+
+func NewPostOrder(service service.Service) *PostOrder {
+	return &PostOrder{service: service}
+}
+
+func (h *PostOrder) Handle(c *gin.Context) {
+	username, exists := c.Get("username")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})
+		return
+	}
+	usernameString, ok := username.(string)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": "unauthorized"})
+	}
+
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "bad request"})
+		return
+	}
+
+	orderID := strings.TrimSpace(string(body))
+	order := models.NewOrder(orderID, usernameString)
+	if !order.IsValid() {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": "bad order id"})
+		return
+	}
+
+	result, exist := h.service.PostOrder(c, order)
+	order = result.Order
+	err = result.Err
+
+	if errors.Is(err, serviceErrors.ErrOrderIDAlreadyExists) {
+		logger.Errorf("order id=%s was already uploaded by different user\n", orderID)
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	} else if err != nil {
+		logger.Errorf("error posting order with order id=%s, err=%v\n", orderID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if exist {
+		c.JSON(http.StatusOK, order)
+		return
+	}
+
+	c.JSON(http.StatusAccepted, order)
+}

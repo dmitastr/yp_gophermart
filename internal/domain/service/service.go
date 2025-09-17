@@ -1,0 +1,20 @@
+package service
+
+import (
+	"github.com/dmitastr/yp_gophermart/internal/domain/models"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/gophermartservice"
+	"github.com/golang-jwt/jwt/v5"
+
+	"context"
+)
+
+type Service interface {
+	RegisterUser(context.Context, models.User) (string, error)
+	LoginUser(context.Context, models.User) (string, error)
+	VerifyJWT(string) (jwt.Claims, error)
+	GetOrders(context.Context, string) ([]models.Order, error)
+	PostOrder(context.Context, *models.Order) (*gophermartservice.WorkerResult, bool)
+	GetBalance(context.Context, string) (*models.Balance, error)
+	PostWithdraw(context.Context, *models.Withdraw) error
+	GetWithdrawals(context.Context, string) ([]models.Withdraw, error)
+}
