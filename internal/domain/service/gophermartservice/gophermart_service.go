@@ -1,8 +1,10 @@
 package gophermartservice
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -38,6 +40,8 @@ type GophermartService struct {
 	mu           sync.Mutex
 	pollInterval time.Duration
 	workersNum   int
+	retryTimeout time.Duration
+	jobQueue     chan *job
 	jobResults   map[models.OrderID]*job
 }
 
@@ -49,7 +53,9 @@ func NewGophermartService(ctx context.Context, cfg *config.Config, db datasource
 		workersNum:   3,
 		client:       accrualclient.NewAccrualClient(cfg.AccrualAddress),
 		jobResults:   make(map[models.OrderID]*job),
+		jobQueue:     make(chan *job),
 	}
+	g.startWorkers(ctx)
 	go g.startPolling(ctx)
 	return g
 }
@@ -141,11 +147,7 @@ func (g *GophermartService) startPolling(ctx context.Context) {
 			g.jobResults = make(map[models.OrderID]*job)
 
 			for _, j := range jobs {
-				result := g.updateOrder(ctx, j.order)
-				for _, w := range j.waiters {
-					w <- result
-					close(w)
-				}
+				g.jobQueue <- j
 			}
 		}
 
@@ -153,7 +155,8 @@ func (g *GophermartService) startPolling(ctx context.Context) {
 }
 
 func (g *GophermartService) updateOrder(ctx context.Context, order *models.Order) *WorkerResult {
-	newOrder, statusCode, err := g.client.GetOrder(ctx, order.OrderID)
+	orderResponse := g.client.GetOrder(ctx, order.OrderID)
+	newOrder := orderResponse.Order
 
 	if newOrder != nil {
 		order.Status = newOrder.Status
@@ -168,7 +171,7 @@ func (g *GophermartService) updateOrder(ctx context.Context, order *models.Order
 		_, _ = g.AddJob(ctx, order)
 	}
 
-	return &WorkerResult{Order: order, Code: statusCode, Err: err}
+	return &WorkerResult{Order: order, Code: orderResponse.StatusCode, Err: orderResponse.Err}
 }
 
 func (g *GophermartService) AddJob(_ context.Context, order *models.Order) (chan *WorkerResult, error) {
@@ -191,9 +194,11 @@ func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) 
 	existedOrder, _ := g.db.GetOrder(ctx, order.OrderID)
 	if existedOrder != nil {
 		if existedOrder.Username != order.Username {
-			logger.Infof("order id=%s already in db\n", order.OrderID)
+			logger.Infof("order id=%s already in db", order.OrderID)
 			return &WorkerResult{Err: serviceErrors.ErrOrderIDAlreadyExists}, false
 		}
+		logger.Infof("order id=%s already uploaded by user", order.OrderID)
+
 		return &WorkerResult{Order: existedOrder, Err: nil, Code: http.StatusOK}, true
 	}
 
@@ -203,4 +208,72 @@ func (g *GophermartService) PostOrder(ctx context.Context, order *models.Order) 
 	}
 	result := <-ch
 	return result, false
+}
+
+func (g *GophermartService) startWorkers(ctx context.Context) {
+	for i := range g.workersNum {
+		go g.startWorker(ctx, i)
+	}
+}
+
+func (g *GophermartService) startWorker(ctx context.Context, workerID int) {
+	logger.Infof("start worker %d", workerID)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case j := <-g.jobQueue:
+			if g.retryTimeout != 0 {
+				logger.Infof("sleep worker for %d seconds", g.retryTimeout)
+				time.Sleep(g.retryTimeout)
+			}
+
+			order := j.order
+			orderResponse := g.client.GetOrder(ctx, order.OrderID)
+			result := &WorkerResult{Order: order, Code: orderResponse.StatusCode, Err: orderResponse.Err}
+
+			if orderResponse.StatusCode == http.StatusTooManyRequests {
+				logger.Infof("set retry timeout=%s", orderResponse.ErrMessage)
+
+				timeout, err := strconv.Atoi(orderResponse.ErrMessage)
+
+				if err == nil {
+					g.retryTimeout = time.Duration(timeout) * time.Second
+				} else {
+					g.retryTimeout = 3 * time.Second
+				}
+				_, _ = g.AddJob(ctx, order)
+
+				for _, waitChannel := range j.waiters {
+					waitChannel <- result
+					close(waitChannel)
+				}
+
+				continue
+			}
+
+			g.retryTimeout = 0
+
+			newOrder := orderResponse.Order
+			if newOrder != nil {
+				order.Status = newOrder.Status
+				order.Accrual = newOrder.Accrual
+
+			}
+
+			dbErr := g.db.PostOrder(ctx, order)
+			orderResponse.Err = errors.Join(dbErr, orderResponse.Err)
+
+			for _, waitChannel := range j.waiters {
+				waitChannel <- result
+				close(waitChannel)
+			}
+
+			if !order.IsFinal() {
+				_, _ = g.AddJob(ctx, order)
+			}
+
+		}
+	}
 }
