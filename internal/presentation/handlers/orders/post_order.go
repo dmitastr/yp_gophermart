@@ -1,4 +1,4 @@
-package handlers
+package orders
 
 import (
 	"errors"
@@ -7,17 +7,17 @@ import (
 	"strings"
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
-	"github.com/dmitastr/yp_gophermart/internal/domain/service"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/orders"
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/gin-gonic/gin"
 )
 
 type PostOrder struct {
-	service service.Service
+	service orders.Service
 }
 
-func NewPostOrder(service service.Service) *PostOrder {
+func NewPostOrder(service orders.Service) *PostOrder {
 	return &PostOrder{service: service}
 }
 

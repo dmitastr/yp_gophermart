@@ -9,8 +9,11 @@ import (
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/datasources/postgresstorage"
-	"github.com/dmitastr/yp_gophermart/internal/domain/service/gophermartservice"
-	"github.com/dmitastr/yp_gophermart/internal/presentation/handlers"
+	iamService "github.com/dmitastr/yp_gophermart/internal/domain/service/iam"
+	ordersService "github.com/dmitastr/yp_gophermart/internal/domain/service/orders"
+
+	iamHandlers "github.com/dmitastr/yp_gophermart/internal/presentation/handlers/iam"
+	ordersHandlers "github.com/dmitastr/yp_gophermart/internal/presentation/handlers/orders"
 	"github.com/dmitastr/yp_gophermart/internal/presentation/middleware"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
@@ -24,25 +27,26 @@ func Init(ctx context.Context, cfg *config.Config) *http.Server {
 		panic(err)
 	}
 
-	service := gophermartservice.NewGophermartService(ctx, cfg, db)
+	ordersManageService := ordersService.NewGophermartService(ctx, cfg, db)
+	authService := iamService.NewGophermartService(ctx, cfg, db)
 
-	authCheck := middleware.NewAuthorizeCheck(service)
+	authCheck := middleware.NewAuthorizeCheck(authService)
 	gzipCompression := gzip.Gzip(gzip.DefaultCompression)
 
 	api := router.Group("/api")
 
 	users := api.Group("/user")
-	users.POST("/register", handlers.NewRegister(service).Handle)
-	users.POST("/login", handlers.NewLogin(service).Handle)
-	users.GET("/withdrawals", authCheck.Handle, gzipCompression, handlers.NewGetWithdrawals(service).Handle)
+	users.POST("/register", iamHandlers.NewRegister(authService).Handle)
+	users.POST("/login", iamHandlers.NewLogin(authService).Handle)
+	users.GET("/withdrawals", authCheck.Handle, gzipCompression, ordersHandlers.NewGetWithdrawals(ordersManageService).Handle)
 
 	balance := users.Group("/balance", authCheck.Handle)
-	balance.GET("/", handlers.NewGetBalance(service).Handle)
-	balance.POST("/withdraw", handlers.NewBalanceWithdraw(service).Handle)
+	balance.GET("/", ordersHandlers.NewGetBalance(ordersManageService).Handle)
+	balance.POST("/withdraw", ordersHandlers.NewBalanceWithdraw(ordersManageService).Handle)
 
 	orders := users.Group("/orders", authCheck.Handle)
-	orders.GET("/", gzipCompression, handlers.NewGetOrders(service).Handle)
-	orders.POST("/", handlers.NewPostOrder(service).Handle)
+	orders.GET("/", gzipCompression, ordersHandlers.NewGetOrders(ordersManageService).Handle)
+	orders.POST("/", ordersHandlers.NewPostOrder(ordersManageService).Handle)
 
 	server := &http.Server{
 		Addr:              cfg.Address,

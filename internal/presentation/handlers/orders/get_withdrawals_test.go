@@ -1,4 +1,4 @@
-package handlers
+package orders
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
-	mockservice "github.com/dmitastr/yp_gophermart/internal/mocks/service"
+	mockservice "github.com/dmitastr/yp_gophermart/internal/mocks/service/orders"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"

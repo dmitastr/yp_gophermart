@@ -1,21 +1,21 @@
-package handlers
+package iam
 
 import (
 	"errors"
 	"net/http"
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
-	"github.com/dmitastr/yp_gophermart/internal/domain/service"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/iam"
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/gin-gonic/gin"
 )
 
 type Register struct {
-	service service.Service
+	service iam.Service
 }
 
-func NewRegister(service service.Service) *Register {
+func NewRegister(service iam.Service) *Register {
 	return &Register{service: service}
 }
 
