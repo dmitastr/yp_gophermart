@@ -12,6 +12,7 @@ import (
 	"context"
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/client"
 )
 
 type AccrualClient struct {
@@ -26,35 +27,42 @@ func NewAccrualClient(baseURL string) *AccrualClient {
 	return &AccrualClient{baseURL: baseURL, client: &http.Client{Timeout: 10 * time.Second}}
 }
 
-func (a *AccrualClient) GetOrder(ctx context.Context, orderID models.OrderID) (order *models.Order, statusCode int, err error) {
+func (a *AccrualClient) GetOrder(ctx context.Context, orderID models.OrderID) *client.OrderResponse {
+	orderResponse := &client.OrderResponse{}
 	callURL, _ := url.JoinPath(a.baseURL, "api/orders", string(orderID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, callURL, nil)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error creating request: %w", err)
+		orderResponse.Err = fmt.Errorf("error creating request: %w", err)
+		return orderResponse
 	}
 
 	resp, err := a.client.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error executing request: %w", err)
+		orderResponse.Err = fmt.Errorf("error executing request: %w", err)
+		return orderResponse
 	}
+
+	orderResponse.StatusCode = resp.StatusCode
 
 	if resp.StatusCode == http.StatusNoContent {
-		return order, resp.StatusCode, nil
+		orderResponse.StatusCode = resp.StatusCode
+		return orderResponse
 	} else if resp.StatusCode != http.StatusOK {
-		return nil, resp.StatusCode, fmt.Errorf("error executing request: %s", resp.Status)
+		orderResponse.Err = fmt.Errorf("error executing request: %s", resp.Status)
+		orderResponse.ErrMessage = resp.Header.Get("Retry-After")
+		return orderResponse
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(&order)
-	if err != nil {
-		return nil, 0, fmt.Errorf("error decoding response: %w", err)
+	if err := json.NewDecoder(resp.Body).Decode(&orderResponse.Order); err != nil {
+		orderResponse.Err = fmt.Errorf("error decoding response: %w, status code=%d", err, resp.StatusCode)
+		return orderResponse
 	}
 
 	defer func() {
 		err = errors.Join(err, resp.Body.Close())
 	}()
 
-	order.SetOrderID(string(orderID))
-	statusCode = resp.StatusCode
+	orderResponse.Order.SetOrderID(string(orderID))
 
-	return order, resp.StatusCode, nil
+	return orderResponse
 }

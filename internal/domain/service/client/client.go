@@ -7,5 +7,12 @@ import (
 )
 
 type Client interface {
-	GetOrder(ctx context.Context, orderID models.OrderID) (order *models.Order, statusCode int, err error)
+	GetOrder(ctx context.Context, orderID models.OrderID) *OrderResponse
+}
+
+type OrderResponse struct {
+	Order      *models.Order
+	StatusCode int
+	Err        error
+	ErrMessage string
 }
