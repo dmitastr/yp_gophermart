@@ -154,26 +154,6 @@ func (g *GophermartService) startPolling(ctx context.Context) {
 	}
 }
 
-func (g *GophermartService) updateOrder(ctx context.Context, order *models.Order) *WorkerResult {
-	orderResponse := g.client.GetOrder(ctx, order.OrderID)
-	newOrder := orderResponse.Order
-
-	if newOrder != nil {
-		order.Status = newOrder.Status
-		order.Accrual = newOrder.Accrual
-	}
-
-	if err := g.db.PostOrder(ctx, order); err != nil {
-		return &WorkerResult{Order: order, Err: err}
-	}
-
-	if !order.IsFinal() {
-		_, _ = g.AddJob(ctx, order)
-	}
-
-	return &WorkerResult{Order: order, Code: orderResponse.StatusCode, Err: orderResponse.Err}
-}
-
 func (g *GophermartService) AddJob(_ context.Context, order *models.Order) (chan *WorkerResult, error) {
 	respChan := make(chan *WorkerResult, 1)
 
