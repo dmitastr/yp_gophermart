@@ -1,4 +1,4 @@
-package handlers
+package orders
 
 import (
 	"bytes"
@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
-	"github.com/dmitastr/yp_gophermart/internal/domain/service/gophermartservice"
-	mock_service "github.com/dmitastr/yp_gophermart/internal/mocks/service"
+	ordersManageService "github.com/dmitastr/yp_gophermart/internal/domain/service/orders"
+	mockService "github.com/dmitastr/yp_gophermart/internal/mocks/service/orders"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ func TestPostOrder_Handle(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 
-	mockService := mock_service.NewMockService(ctrl)
+	service := mockService.NewMockService(ctrl)
 
 	type args struct {
 		orderID    models.OrderID
@@ -83,14 +83,14 @@ func TestPostOrder_Handle(t *testing.T) {
 			req.Header.Set("Content-Type", "text/plain; charset=utf-8")
 			c.Request = req
 
-			serviceResult := &gophermartservice.WorkerResult{
+			serviceResult := &ordersManageService.WorkerResult{
 				Order: &models.Order{OrderID: tt.args.orderID},
 				Code:  http.StatusOK,
 				Err:   tt.args.err,
 			}
-			mockService.EXPECT().PostOrder(c, gomock.Any()).Return(serviceResult, tt.args.orderExist).AnyTimes()
+			service.EXPECT().PostOrder(c, gomock.Any()).Return(serviceResult, tt.args.orderExist).AnyTimes()
 
-			h := &PostOrder{service: mockService}
+			h := &PostOrder{service: service}
 			h.Handle(c)
 
 			assert.EqualValues(t, tt.wantCode, w.Code)

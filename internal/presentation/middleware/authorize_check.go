@@ -4,15 +4,15 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dmitastr/yp_gophermart/internal/domain/service"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/iam"
 	"github.com/gin-gonic/gin"
 )
 
 type AuthorizeCheck struct {
-	service service.Service
+	service iam.Service
 }
 
-func NewAuthorizeCheck(service service.Service) *AuthorizeCheck {
+func NewAuthorizeCheck(service iam.Service) *AuthorizeCheck {
 	return &AuthorizeCheck{service: service}
 }
 

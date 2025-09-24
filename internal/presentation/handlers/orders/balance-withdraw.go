@@ -1,4 +1,4 @@
-package handlers
+package orders
 
 import (
 	"encoding/json"
@@ -6,17 +6,17 @@ import (
 	"net/http"
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
-	"github.com/dmitastr/yp_gophermart/internal/domain/service"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/orders"
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/gin-gonic/gin"
 )
 
 type BalanceWithdraw struct {
-	service service.Service
+	service orders.Service
 }
 
-func NewBalanceWithdraw(service service.Service) *BalanceWithdraw {
+func NewBalanceWithdraw(service orders.Service) *BalanceWithdraw {
 	return &BalanceWithdraw{service: service}
 }
 

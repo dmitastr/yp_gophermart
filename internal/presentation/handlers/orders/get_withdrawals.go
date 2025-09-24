@@ -1,17 +1,17 @@
-package handlers
+package orders
 
 import (
 	"net/http"
 
-	"github.com/dmitastr/yp_gophermart/internal/domain/service"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/orders"
 	"github.com/gin-gonic/gin"
 )
 
 type GetWithdrawals struct {
-	service service.Service
+	service orders.Service
 }
 
-func NewGetWithdrawals(service service.Service) *GetWithdrawals {
+func NewGetWithdrawals(service orders.Service) *GetWithdrawals {
 	return &GetWithdrawals{service: service}
 }
 

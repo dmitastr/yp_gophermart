@@ -1,4 +1,4 @@
-package handlers
+package orders
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
-	mockservice "github.com/dmitastr/yp_gophermart/internal/mocks/service"
+	mockservice "github.com/dmitastr/yp_gophermart/internal/mocks/service/orders"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"

@@ -1,17 +1,17 @@
-package handlers
+package orders
 
 import (
 	"net/http"
 
-	"github.com/dmitastr/yp_gophermart/internal/domain/service"
+	"github.com/dmitastr/yp_gophermart/internal/domain/service/orders"
 	"github.com/gin-gonic/gin"
 )
 
 type GetBalance struct {
-	service service.Service
+	service orders.Service
 }
 
-func NewGetBalance(service service.Service) *GetBalance {
+func NewGetBalance(service orders.Service) *GetBalance {
 	return &GetBalance{service: service}
 }
 
