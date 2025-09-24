@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	models "github.com/dmitastr/yp_gophermart/internal/domain/models"
+	jwt "github.com/golang-jwt/jwt/v5"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -36,7 +37,7 @@ func (m *MockService) EXPECT() *MockServiceMockRecorder {
 }
 
 // LoginUser mocks base method.
-func (m *MockService) LoginUser(arg0 context.Context, arg1 models.User) (string, error) {
+func (m *MockService) LoginUser(arg0 context.Context, arg1 *models.User) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LoginUser", arg0, arg1)
 	ret0, _ := ret[0].(string)
@@ -51,7 +52,7 @@ func (mr *MockServiceMockRecorder) LoginUser(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // RegisterUser mocks base method.
-func (m *MockService) RegisterUser(arg0 context.Context, arg1 models.User) (string, error) {
+func (m *MockService) RegisterUser(arg0 context.Context, arg1 *models.User) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RegisterUser", arg0, arg1)
 	ret0, _ := ret[0].(string)
@@ -63,4 +64,19 @@ func (m *MockService) RegisterUser(arg0 context.Context, arg1 models.User) (stri
 func (mr *MockServiceMockRecorder) RegisterUser(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterUser", reflect.TypeOf((*MockService)(nil).RegisterUser), arg0, arg1)
+}
+
+// VerifyJWT mocks base method.
+func (m *MockService) VerifyJWT(arg0 string) (jwt.Claims, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyJWT", arg0)
+	ret0, _ := ret[0].(jwt.Claims)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// VerifyJWT indicates an expected call of VerifyJWT.
+func (mr *MockServiceMockRecorder) VerifyJWT(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyJWT", reflect.TypeOf((*MockService)(nil).VerifyJWT), arg0)
 }
