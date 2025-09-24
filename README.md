@@ -23,3 +23,5 @@ git fetch template && git checkout template/master .github
 ```
 
 Затем добавьте полученные изменения в свой репозиторий.
+
+![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/dmitastr/c2e11faf0eaeaf3059a1868038b74ee5/raw/badge.json)
