@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
+	"github.com/dmitastr/yp_gophermart/internal/datasources/postgresstorage/retrypolicy"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
-	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
+	_ "github.com/dmitastr/yp_gophermart/internal/errors"
 	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,10 +19,13 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+
+	"github.com/avast/retry-go/v4"
 )
 
 type PostgresStorage struct {
-	pool *pgxpool.Pool
+	pool        *pgxpool.Pool
+	retryPolicy *retrypolicy.RetryPolicy
 }
 
 func NewPostgresStorage(ctx context.Context, cfg *config.Config) (*PostgresStorage, error) {
@@ -46,10 +51,38 @@ func NewPostgresStorage(ctx context.Context, cfg *config.Config) (*PostgresStora
 	}
 	logger.Infof("Database migration succeeded")
 
-	return &PostgresStorage{pool: pool}, nil
+	rp := retrypolicy.NewRetryPolicy(3, time.Second, true)
+
+	return &PostgresStorage{pool: pool, retryPolicy: rp}, nil
 }
 
-func (p *PostgresStorage) execute(ctx context.Context, tx pgx.Tx, query string, args pgx.NamedArgs) (err error) {
+func (p *PostgresStorage) executeTxWithRetry(ctx context.Context, tx pgx.Tx, query string, args pgx.NamedArgs, lock bool) (err error) {
+	err = retry.Do(
+		func() error {
+			return p.executeTx(ctx, tx, query, args, lock)
+		},
+		p.retryPolicy.GetOptions(ctx)...,
+	)
+
+	return
+}
+
+func (p *PostgresStorage) executeWithRetry(ctx context.Context, op retry.RetryableFunc) (err error) {
+	err = retry.Do(
+		op,
+		p.retryPolicy.GetOptions(ctx)...,
+	)
+
+	return
+}
+
+func (p *PostgresStorage) executeTx(ctx context.Context, tx pgx.Tx, query string, args pgx.NamedArgs, lock bool) (err error) {
+	if lock {
+		lockQuery := `SELECT pg_advisory_xact_lock(('x' || md5(@username))::bit(64)::bigint)`
+		if _, err := tx.Exec(ctx, lockQuery, args); err != nil {
+			return fmt.Errorf("error locking rows: %v", err)
+		}
+	}
 	if _, err := tx.Exec(ctx, query, args); err != nil {
 		return fmt.Errorf("error inserting order: %v", err)
 	}
@@ -68,36 +101,7 @@ func (p *PostgresStorage) execute(ctx context.Context, tx pgx.Tx, query string, 
 
 }
 
-func (p *PostgresStorage) executeWithLock(ctx context.Context, tx pgx.Tx, query string, args pgx.NamedArgs) (err error) {
-	lockQuery := `SELECT pg_advisory_xact_lock(('x' || md5(@username))::bit(64)::bigint)`
-	if _, err := tx.Exec(ctx, lockQuery, args); err != nil {
-		return fmt.Errorf("error locking rows: %v", err)
-	}
-
-	ct, err := tx.Exec(ctx, query, args)
-	if err != nil {
-		return fmt.Errorf("error inserting order: %v", err)
-	}
-
-	if ct.RowsAffected() == 0 {
-		return serviceErrors.ErrInsufficientFunds
-	}
-
-	defer func() {
-		if rErr := tx.Rollback(ctx); rErr != nil && !errors.Is(rErr, pgx.ErrTxClosed) {
-			err = errors.Join(err, rErr)
-			logger.Errorf("Error rolling back transaction: %v", rErr)
-		}
-	}()
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-	return nil
-
-}
-
-func (p *PostgresStorage) InsertUser(ctx context.Context, user models.User) (err error) {
+func (p *PostgresStorage) InsertUser(ctx context.Context, user *models.User) (err error) {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -105,26 +109,32 @@ func (p *PostgresStorage) InsertUser(ctx context.Context, user models.User) (err
 
 	query := `INSERT INTO users (username, password, created_at) VALUES (@name, @pass, @created_at)`
 	args := user.ToNamedArgs()
-	if err := p.execute(ctx, tx, query, args); err != nil {
+	if err := p.executeTxWithRetry(ctx, tx, query, args, false); err != nil {
 		return err
 	}
 
 	return
 }
 
-func (p *PostgresStorage) GetUser(ctx context.Context, username string) (models.User, error) {
+func (p *PostgresStorage) GetUser(ctx context.Context, username string) (*models.User, error) {
 	var user models.User
-	err := p.pool.QueryRow(ctx, `SELECT username, password FROM users WHERE username = $1`, username).Scan(&user.Name, &user.Password)
-	return user, err
+	query := `SELECT username, password FROM users WHERE username = $1`
+
+	err := p.executeWithRetry(ctx, func() error {
+		return p.pool.QueryRow(ctx, query, username).Scan(&user.Name, &user.Password)
+	})
+
+	return &user, err
 }
 
-func (p *PostgresStorage) UpdateUser(ctx context.Context, user models.User) error {
+func (p *PostgresStorage) UpdateUser(ctx context.Context, user *models.User) error {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 
-	if err := p.execute(ctx, tx, `UPDATE users SET password=@pass WHERE username = @name`, user.ToNamedArgs()); err != nil {
+	query := `UPDATE users SET password=@pass WHERE username = @name`
+	if err := p.executeTxWithRetry(ctx, tx, query, user.ToNamedArgs(), false); err != nil {
 		return err
 	}
 
@@ -132,14 +142,22 @@ func (p *PostgresStorage) UpdateUser(ctx context.Context, user models.User) erro
 }
 
 func (p *PostgresStorage) GetOrders(ctx context.Context, username string) ([]models.Order, error) {
+	var rows pgx.Rows
+	var err error
+
 	query := `SELECT order_id, status, accrual, uploaded_at, username
 				FROM orders 
                 WHERE username = $1 
                 ORDER BY uploaded_at DESC`
 
-	rows, err := p.pool.Query(ctx, query, username)
-	if err != nil {
-		return nil, fmt.Errorf("error getting orders: %v", err)
+	if retryErr := p.executeWithRetry(ctx, func() error {
+		rows, err = p.pool.Query(ctx, query, username)
+		if err != nil {
+			return fmt.Errorf("error getting orders: %w", err)
+		}
+		return nil
+	}); retryErr != nil {
+		return nil, retryErr
 	}
 
 	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Order])
@@ -151,7 +169,11 @@ func (p *PostgresStorage) GetOrder(ctx context.Context, orderID models.OrderID) 
                 WHERE order_id = $1`
 
 	var order models.Order
-	err := p.pool.QueryRow(ctx, query, orderID).Scan(&order.OrderID, &order.Status, &order.Accrual, &order.UploadedAt, &order.Username)
+
+	err := p.executeWithRetry(ctx, func() error {
+		return p.pool.QueryRow(ctx, query, orderID).Scan(&order.OrderID, &order.Status, &order.Accrual, &order.UploadedAt, &order.Username)
+	})
+
 	if err != nil {
 		return nil, fmt.Errorf("error getting order: %v", err)
 	}
@@ -171,7 +193,7 @@ func (p *PostgresStorage) PostOrder(ctx context.Context, order *models.Order) (e
 	status = @status, 
     accrual = @accrual`
 
-	if err := p.execute(ctx, tx, query, order.ToNamedArgs()); err != nil {
+	if err := p.executeTxWithRetry(ctx, tx, query, order.ToNamedArgs(), false); err != nil {
 		return err
 	}
 	return nil
@@ -187,7 +209,10 @@ func (p *PostgresStorage) GetBalance(ctx context.Context, username string) (*mod
 	var withdrawn sql.NullFloat64
 	var current sql.NullFloat64
 
-	err := p.pool.QueryRow(ctx, query, username).Scan(&balance.Username, &current, &withdrawn)
+	err := p.executeWithRetry(ctx, func() error {
+		return p.pool.QueryRow(ctx, query, username).Scan(&balance.Username, &current, &withdrawn)
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +247,7 @@ func (p *PostgresStorage) PostWithdraw(ctx context.Context, withdraw *models.Wit
 			WHERE balance_cte.current >= @sum 
 			ON CONFLICT (order_id, username)  DO NOTHING`
 
-	if err := p.executeWithLock(ctx, tx, query, withdraw.ToNamedArgs()); err != nil {
+	if err := p.executeTxWithRetry(ctx, tx, query, withdraw.ToNamedArgs(), true); err != nil {
 		return err
 	}
 
@@ -230,14 +255,23 @@ func (p *PostgresStorage) PostWithdraw(ctx context.Context, withdraw *models.Wit
 }
 
 func (p *PostgresStorage) GetWithdrawals(ctx context.Context, username string) ([]models.Withdraw, error) {
+	var rows pgx.Rows
+	var err error
+
 	query := `SELECT order_id, sum, processed_at, username
 				FROM withdrawals 
                 WHERE username = $1 
                 ORDER BY processed_at DESC`
 
-	rows, err := p.pool.Query(ctx, query, username)
-	if err != nil {
-		return nil, fmt.Errorf("error getting witdrawals: %v", err)
+	retryErr := p.executeWithRetry(ctx, func() error {
+		rows, err = p.pool.Query(ctx, query, username)
+		if err != nil {
+			return fmt.Errorf("error getting witdrawals: %w", err)
+		}
+		return nil
+	})
+	if retryErr != nil {
+		return nil, retryErr
 	}
 
 	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Withdraw])

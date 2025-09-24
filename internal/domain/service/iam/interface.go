@@ -8,7 +8,7 @@ import (
 )
 
 type Service interface {
-	RegisterUser(context.Context, models.User) (string, error)
+	RegisterUser(context.Context, *models.User) (string, error)
 	VerifyJWT(string) (jwt.Claims, error)
-	LoginUser(context.Context, models.User) (string, error)
+	LoginUser(context.Context, *models.User) (string, error)
 }
