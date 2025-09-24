@@ -8,6 +8,7 @@ import (
 
 	"github.com/dmitastr/yp_gophermart/internal/config"
 	"github.com/dmitastr/yp_gophermart/internal/domain/models"
+	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
 	"github.com/dmitastr/yp_gophermart/internal/logger"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -51,6 +52,35 @@ func NewPostgresStorage(ctx context.Context, cfg *config.Config) (*PostgresStora
 func (p *PostgresStorage) execute(ctx context.Context, tx pgx.Tx, query string, args pgx.NamedArgs) (err error) {
 	if _, err := tx.Exec(ctx, query, args); err != nil {
 		return fmt.Errorf("error inserting order: %v", err)
+	}
+
+	defer func() {
+		if rErr := tx.Rollback(ctx); rErr != nil && !errors.Is(rErr, pgx.ErrTxClosed) {
+			err = errors.Join(err, rErr)
+			logger.Errorf("Error rolling back transaction: %v", rErr)
+		}
+	}()
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+
+}
+
+func (p *PostgresStorage) executeWithLock(ctx context.Context, tx pgx.Tx, query string, args pgx.NamedArgs) (err error) {
+	lockQuery := `SELECT pg_advisory_xact_lock(('x' || md5(@username))::bit(64)::bigint)`
+	if _, err := tx.Exec(ctx, lockQuery, args); err != nil {
+		return fmt.Errorf("error locking rows: %v", err)
+	}
+
+	ct, err := tx.Exec(ctx, query, args)
+	if err != nil {
+		return fmt.Errorf("error inserting order: %v", err)
+	}
+
+	if ct.RowsAffected() == 0 {
+		return serviceErrors.ErrInsufficientFunds
 	}
 
 	defer func() {
@@ -179,11 +209,20 @@ func (p *PostgresStorage) PostWithdraw(ctx context.Context, withdraw *models.Wit
 		return err
 	}
 
-	query := `INSERT INTO withdrawals (username, order_id, sum, processed_at) 
-	VALUES (@username, @order_id, @sum, @processed_at) 
-	ON CONFLICT (order_id, username)  DO NOTHING`
+	query := `
+			WITH balance_cte AS (
+			  SELECT 
+				current
+			  FROM balance
+			  WHERE username=@username
+			)
+			INSERT INTO withdrawals (username, order_id, sum, processed_at)
+			SELECT @username, @order_id, @sum, @processed_at
+				FROM balance_cte
+			WHERE balance_cte.current >= @sum 
+			ON CONFLICT (order_id, username)  DO NOTHING`
 
-	if err := p.execute(ctx, tx, query, withdraw.ToNamedArgs()); err != nil {
+	if err := p.executeWithLock(ctx, tx, query, withdraw.ToNamedArgs()); err != nil {
 		return err
 	}
 
