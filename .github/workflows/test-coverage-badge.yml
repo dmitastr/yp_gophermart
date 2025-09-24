@@ -34,7 +34,6 @@ jobs:
         uses: schneegans/dynamic-badges-action@v1.7.0
         with:
           label: Coverage
-          schemaVersion: 1
           message: ${{ steps.get_coverage.outputs.coverage_percentage }}%
           color: green # Or dynamically set based on percentage
           style: flat-square
