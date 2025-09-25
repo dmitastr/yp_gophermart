@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	serviceErrors "github.com/dmitastr/yp_gophermart/internal/errors"
-	"github.com/dmitastr/yp_gophermart/internal/mocks/service"
+	mockservice "github.com/dmitastr/yp_gophermart/internal/mocks/service/iam"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -73,7 +73,7 @@ func TestRegister_Handle(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json; charset=utf-8")
 			c.Request = req
 
-			mockService := mock_service.NewMockService(ctrl)
+			mockService := mockservice.NewMockService(ctrl)
 			mockService.EXPECT().RegisterUser(c, gomock.Any()).Return(tt.args.token, tt.serviceErr).AnyTimes()
 
 			Register{service: mockService}.Handle(c)

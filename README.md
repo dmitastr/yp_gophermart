@@ -1,25 +1,28 @@
-# go-musthave-diploma-tpl
 
-Шаблон репозитория для индивидуального дипломного проекта курса «Go-разработчик»
+![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/dmitastr/c2e11faf0eaeaf3059a1868038b74ee5/raw/badge.json)
+[![Go Reference](https://pkg.go.dev/badge/golang.org/x/example.svg)](https://pkg.go.dev/golang.org/x/example)
 
-# Начало работы
+# Gophermart 
+Diploma project for Yandex Practicum GO course
 
-1. Склонируйте репозиторий в любую подходящую директорию на вашем компьютере.
-2. В корне репозитория выполните команду `go mod init <name>` (где `<name>` — адрес вашего репозитория на GitHub без
-   префикса `https://`) для создания модуля
-
-# Обновление шаблона
-
-Чтобы иметь возможность получать обновления автотестов и других частей шаблона, выполните команду:
-
+## Getting started
+### Prerequisites
+- go
+- docker
+### Installation
+1. Clone the repo
 ```
-git remote add -m master template https://github.com/yandex-praktikum/go-musthave-diploma-tpl.git
+$ git clone https://github.com/dmitastr/yp_gophermart.git
+$ cd yp_gophermart
 ```
+2. Edit config/gophermart_app.env file 
 
-Для обновления кода автотестов выполните команду:
-
+### Run the project
+1. Build
 ```
-git fetch template && git checkout template/master .github
+$ go build -o gophermart ./cmd/gophermart
 ```
-
-Затем добавьте полученные изменения в свой репозиторий.
+2. Execute
+```
+$ go build -o gophermart ./cmd/gophermart
+```
