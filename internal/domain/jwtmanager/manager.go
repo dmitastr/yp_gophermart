@@ -12,7 +12,7 @@ import (
 )
 
 type Manager interface {
-	IssueJWT(models.User) (string, error)
+	IssueJWT(*models.User) (string, error)
 	VerifyJWT(string) (jwt.Claims, error)
 }
 
@@ -26,7 +26,7 @@ func NewJWTManager(cfg *config.Config) *JWTManager {
 	return manager
 }
 
-func (j *JWTManager) IssueJWT(user models.User) (string, error) {
+func (j *JWTManager) IssueJWT(user *models.User) (string, error) {
 	claims := jwt.RegisteredClaims{
 		Subject:   user.Name,
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),

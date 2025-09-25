@@ -26,7 +26,7 @@ func NewGophermartService(_ context.Context, cfg *config.Config, db datasources.
 	return g
 }
 
-func (g *IAMService) RegisterUser(ctx context.Context, user models.User) (string, error) {
+func (g *IAMService) RegisterUser(ctx context.Context, user *models.User) (string, error) {
 	err := user.HashPassword()
 	if err != nil {
 		return "", err
@@ -44,7 +44,7 @@ func (g *IAMService) RegisterUser(ctx context.Context, user models.User) (string
 	return token, nil
 }
 
-func (g *IAMService) LoginUser(ctx context.Context, user models.User) (token string, err error) {
+func (g *IAMService) LoginUser(ctx context.Context, user *models.User) (token string, err error) {
 	userExpected, err := g.db.GetUser(ctx, user.Name)
 	if err != nil {
 		return token, serviceErrors.ErrDoesNotUserExist
